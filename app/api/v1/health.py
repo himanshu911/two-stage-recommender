@@ -32,8 +32,8 @@ router = APIRouter()
 )
 async def health_check(
     session: SessionDep,
-    feature_service: FeatureServiceDep = Depends(),
-    recommendation_service: RecommendationServiceDep = Depends()
+    feature_service: FeatureServiceDep,
+    recommendation_service: RecommendationServiceDep
 ) -> HealthCheckResponse:
     """
     Perform comprehensive health check.
@@ -154,7 +154,7 @@ async def liveness_check() -> Dict[str, str]:
     description="Get various application performance and health metrics"
 )
 async def get_metrics(
-    recommendation_service: RecommendationServiceDep = Depends()
+    recommendation_service: RecommendationServiceDep
 ) -> Dict[str, Any]:
     """
     Get application metrics.

@@ -9,7 +9,8 @@ Design Rationale:
 - Proper error handling and validation
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 
 from app.models.database import Interaction, InteractionType
@@ -20,10 +21,16 @@ from app.models.schemas import (
 )
 from app.repositories.interaction_repository import InteractionRepository
 from app.repositories.user_repository import UserRepository
-from app.core.dependencies import SessionDep, get_user_repository
+from app.core.dependencies import (
+    get_user_repository,
+    get_interaction_repository,
+    get_feature_service,
+    UserRepositoryDep,
+    InteractionRepositoryDep,
+    FeatureServiceDep
+)
 from app.core.logging import get_logger
 from app.services.feature_service import FeatureService
-from app.core.dependencies import FeatureServiceDep
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -38,9 +45,9 @@ router = APIRouter()
 )
 async def create_interaction(
     interaction_data: InteractionCreateRequest,
-    user_repository: UserRepository = Depends(get_user_repository),
-    interaction_repository: InteractionRepository = Depends(),
-    feature_service: FeatureService = Depends()
+    user_repository: UserRepositoryDep,
+    interaction_repository: InteractionRepositoryDep,
+    feature_service: FeatureServiceDep
 ) -> InteractionResponse:
     """
     Create a new interaction.
@@ -113,13 +120,13 @@ async def create_interaction(
 )
 async def get_user_interactions(
     user_id: int,
+    interaction_repository: InteractionRepositoryDep,
+    user_repository: UserRepositoryDep,
     interaction_type: Optional[InteractionType] = Query(None, description="Filter by interaction type"),
     start_date: Optional[datetime] = Query(None, description="Filter by start date"),
     end_date: Optional[datetime] = Query(None, description="Filter by end date"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
-    interaction_repository: InteractionRepository = Depends(),
-    user_repository: UserRepository = Depends(get_user_repository)
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return")
 ) -> List[InteractionResponse]:
     """
     Get interactions for a user.
@@ -179,10 +186,10 @@ async def get_user_interactions(
 )
 async def get_interaction_stats(
     user_id: int,
+    interaction_repository: InteractionRepositoryDep,
+    user_repository: UserRepositoryDep,
     start_date: Optional[datetime] = Query(None, description="Filter by start date"),
-    end_date: Optional[datetime] = Query(None, description="Filter by end date"),
-    interaction_repository: InteractionRepository = Depends(),
-    user_repository: UserRepository = Depends(get_user_repository)
+    end_date: Optional[datetime] = Query(None, description="Filter by end date")
 ) -> Dict[str, int]:
     """
     Get interaction statistics for a user.
@@ -233,8 +240,8 @@ async def get_interaction_stats(
 async def get_mutual_interactions(
     user_id: int,
     target_user_id: int,
-    interaction_repository: InteractionRepository = Depends(),
-    user_repository: UserRepository = Depends(get_user_repository)
+    interaction_repository: InteractionRepositoryDep,
+    user_repository: UserRepositoryDep
 ) -> List[InteractionResponse]:
     """
     Get mutual interactions between two users.
@@ -294,10 +301,10 @@ async def get_mutual_interactions(
 )
 async def get_recent_interactions(
     user_id: int,
+    interaction_repository: InteractionRepositoryDep,
+    user_repository: UserRepositoryDep,
     days: int = Query(30, ge=1, le=365, description="Number of days to look back"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of interactions"),
-    interaction_repository: InteractionRepository = Depends(),
-    user_repository: UserRepository = Depends(get_user_repository)
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of interactions")
 ) -> List[InteractionResponse]:
     """
     Get recent interactions for a user.
@@ -356,10 +363,10 @@ async def get_recent_interactions(
 )
 async def get_interaction_timeline(
     user_id: int,
+    interaction_repository: InteractionRepositoryDep,
+    user_repository: UserRepositoryDep,
     interval_days: int = Query(7, ge=1, le=30, description="Days per interval"),
-    lookback_days: int = Query(30, ge=1, le=365, description="Total days to look back"),
-    interaction_repository: InteractionRepository = Depends(),
-    user_repository: UserRepository = Depends(get_user_repository)
+    lookback_days: int = Query(30, ge=1, le=365, description="Total days to look back")
 ) -> List[Dict[str, Any]]:
     """
     Get interaction timeline for a user.

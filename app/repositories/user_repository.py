@@ -9,10 +9,10 @@ Design Rationale:
 - Optimized queries for common user operations
 """
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import User, Interaction, InteractionType

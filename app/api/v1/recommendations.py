@@ -18,7 +18,7 @@ from app.models.schemas import (
     RecommendationRequest
 )
 from app.services.recommendation_service import RecommendationService
-from app.core.dependencies import RecommendationServiceDep
+from app.core.dependencies import RecommendationServiceDep, FeatureServiceDep
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -33,13 +33,13 @@ router = APIRouter()
 )
 async def get_recommendations(
     user_id: int,
+    recommendation_service: RecommendationServiceDep,
     limit: int = Query(20, ge=1, le=100, description="Number of recommendations"),
     exclude_seen: bool = Query(True, description="Exclude users already seen"),
     min_age: Optional[int] = Query(None, ge=18, description="Minimum age filter"),
     max_age: Optional[int] = Query(None, le=120, description="Maximum age filter"),
     location: Optional[str] = Query(None, description="Location filter"),
-    algorithm_version: Optional[str] = Query(None, description="Algorithm version to use"),
-    recommendation_service: RecommendationService = Depends()
+    algorithm_version: Optional[str] = Query(None, description="Algorithm version to use")
 ) -> RecommendationResponse:
     """
     Get personalized recommendations for a user.
@@ -106,8 +106,8 @@ async def get_recommendations(
 )
 async def get_recommendations_with_explanations(
     user_id: int,
-    limit: int = Query(20, ge=1, le=100, description="Number of recommendations"),
-    recommendation_service: RecommendationService = Depends()
+    recommendation_service: RecommendationServiceDep,
+    limit: int = Query(20, ge=1, le=100, description="Number of recommendations")
 ) -> Dict[str, Any]:
     """
     Get recommendations with explanations.
@@ -151,8 +151,8 @@ async def get_recommendations_with_explanations(
 )
 async def find_similar_users(
     user_id: int,
-    limit: int = Query(20, ge=1, le=100, description="Number of similar users"),
-    feature_service: FeatureServiceDep = Depends()
+    feature_service: FeatureServiceDep,
+    limit: int = Query(20, ge=1, le=100, description="Number of similar users")
 ) -> List[UserResponse]:
     """
     Find users similar to the specified user.
@@ -185,7 +185,7 @@ async def find_similar_users(
     description="Manually refresh the recommendation cache"
 )
 async def refresh_recommendations(
-    recommendation_service: RecommendationService = Depends()
+    recommendation_service: RecommendationServiceDep
 ) -> Dict[str, str]:
     """
     Refresh recommendation cache.
@@ -212,7 +212,7 @@ async def refresh_recommendations(
     description="Get performance metrics for the recommendation system"
 )
 async def get_performance_metrics(
-    recommendation_service: RecommendationService = Depends()
+    recommendation_service: RecommendationServiceDep
 ) -> Dict[str, Any]:
     """
     Get recommendation performance metrics.

@@ -37,6 +37,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/two-stage-recommender
       - REDIS_URL=redis://redis:6379
@@ -55,23 +57,24 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   # Application worker (for background tasks)
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/two-stage-recommender
-      - REDIS_URL=redis://redis:6379
-      - ENVIRONMENT=development
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./app:/app/app
-      - ./models:/app/models
-    command: python -m app.workers.ml_worker
+  # Commented out temporarily - worker module not yet implemented
+  # worker:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   environment:
+  #     - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/two-stage-recommender
+  #     - REDIS_URL=redis://redis:6379
+  #     - ENVIRONMENT=development
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./app:/app/app
+  #     - ./models:/app/models
+  #   command: python -m app.workers.ml_worker
 
   # Nginx reverse proxy (optional, for production)
   nginx:

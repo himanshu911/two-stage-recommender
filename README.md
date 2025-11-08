@@ -143,12 +143,13 @@ The system follows a microservices-inspired architecture with clean separation o
 
 ## 📚 API Documentation
 
-### Authentication
+### Interactive API Documentation
 
-The API uses JWT tokens for authentication. Include the token in the Authorization header:
-```
-Authorization: Bearer <your-jwt-token>
-```
+Once the application is running, access the interactive API documentation:
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+> **Note**: Authentication is not currently implemented. All API endpoints are publicly accessible.
 
 ### Endpoints
 
@@ -171,7 +172,9 @@ Authorization: Bearer <your-jwt-token>
 #### Health & Monitoring
 - `GET /api/v1/health/` - Comprehensive health check
 - `GET /api/v1/health/ready` - Readiness check
+- `GET /api/v1/health/live` - Liveness check
 - `GET /api/v1/health/metrics` - Application metrics
+- `GET /api/v1/health/models` - ML model information
 
 ### Example Usage
 
@@ -382,22 +385,28 @@ jobs:
 
 ### Planned Features
 
-1. **Real-time ML Updates**
+1. **Authentication & Authorization**
+   - JWT token-based authentication
+   - User registration and login
+   - Role-based access control (RBAC)
+   - API rate limiting per user
+
+2. **Real-time ML Updates**
    - Incremental model training
    - Real-time feature updates
    - Model drift detection
 
-2. **Advanced Recommendation Strategies**
+3. **Advanced Recommendation Strategies**
    - Deep learning models
    - Multi-objective optimization
    - Context-aware recommendations
 
-3. **Social Features**
+4. **Social Features**
    - Friend recommendations
    - Group matching
    - Event-based recommendations
 
-4. **Enhanced Privacy**
+5. **Enhanced Privacy**
    - Differential privacy
    - Federated learning
    - Enhanced data encryption

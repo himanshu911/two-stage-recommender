@@ -10,7 +10,7 @@ Design Rationale:
 """
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -133,7 +133,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             error="Request validation failed",
             detail=str(exc.errors()),
             request_id=request.headers.get("X-Request-ID")
-        ).dict()
+        ).model_dump(mode='json')
     )
 
 
@@ -147,7 +147,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         content=ErrorResponse(
             error=exc.detail,
             request_id=request.headers.get("X-Request-ID")
-        ).dict()
+        ).model_dump(mode='json')
     )
 
 
@@ -162,7 +162,7 @@ async def general_exception_handler(request: Request, exc: Exception):
             error="Internal server error",
             detail="An unexpected error occurred",
             request_id=request.headers.get("X-Request-ID")
-        ).dict()
+        ).model_dump(mode='json')
     )
 
 

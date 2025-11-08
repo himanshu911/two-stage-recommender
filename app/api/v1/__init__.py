@@ -7,8 +7,8 @@ This module exports API v1 routers and endpoints.
 from fastapi import APIRouter
 from app.api.v1 import users, interactions, recommendations, health
 
-# Create main API router
-api_router = APIRouter(prefix="/api/v1")
+# Create main API router (no prefix here - will be added in main.py)
+api_router = APIRouter()
 
 # Include sub-routers
 api_router.include_router(users.router, prefix="/users", tags=["users"])

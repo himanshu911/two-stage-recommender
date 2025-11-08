@@ -21,10 +21,38 @@ from app.services.feature_service import FeatureService
 from app.services.candidate_generation import CandidateGenerationService
 from app.services.ranking_service import RankingService
 from app.services.recommendation_service import RecommendationService
+from app.repositories.user_repository import UserRepository
+from app.repositories.interaction_repository import InteractionRepository
 
 
 # Type aliases for dependency injection
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+
+
+async def get_user_repository(session: SessionDep) -> UserRepository:
+    """
+    Dependency function to get UserRepository instance.
+
+    Args:
+        session: Database session dependency
+
+    Returns:
+        UserRepository instance
+    """
+    return UserRepository(session)
+
+
+async def get_interaction_repository(session: SessionDep) -> InteractionRepository:
+    """
+    Dependency function to get InteractionRepository instance.
+
+    Args:
+        session: Database session dependency
+
+    Returns:
+        InteractionRepository instance
+    """
+    return InteractionRepository(session)
 
 
 async def get_feature_service(session: SessionDep) -> FeatureService:
@@ -107,6 +135,10 @@ async def get_recommendation_service(
         ranking_service=ranking_service
     )
 
+
+# Type aliases for repository dependencies
+UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
+InteractionRepositoryDep = Annotated[InteractionRepository, Depends(get_interaction_repository)]
 
 # Type aliases for service dependencies
 FeatureServiceDep = Annotated[FeatureService, Depends(get_feature_service)]

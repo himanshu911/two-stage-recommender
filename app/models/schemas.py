@@ -146,14 +146,13 @@ class HealthCheckResponse(BaseModel):
     
 class ModelInfoResponse(BaseModel):
     """Response schema for ML model information."""
+    model_config = {"protected_namespaces": (), "from_attributes": True}
+
     model_type: str = Field(..., description="Type of ML model")
     version: str = Field(..., description="Model version")
     is_active: bool = Field(..., description="Whether the model is currently active")
     metrics: Dict[str, Any] = Field(..., description="Model performance metrics")
     created_at: datetime = Field(..., description="Model creation timestamp")
-    
-    class Config:
-        from_attributes = True
 
 
 class ErrorResponse(BaseModel):

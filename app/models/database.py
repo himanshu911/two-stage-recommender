@@ -45,7 +45,7 @@ class User(SQLModel, table=True):
     gender: str = Field(max_length=20)
     location: str = Field(max_length=200)
     bio: Optional[str] = Field(default=None, sa_column=Column(Text))
-    interests: List[str] = Field(default=[], sa_column=Column(JSON))
+    interests: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     
     # Timestamps for data lineage and debugging
     created_at: datetime = Field(
@@ -105,7 +105,7 @@ class Interaction(SQLModel, table=True):
     interaction_type: InteractionType = Field(max_length=20)
     
     # Additional metadata for ML features
-    context: dict = Field(default={})
+    context: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     timestamp: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime, server_default=func.now(), index=True)
@@ -145,7 +145,7 @@ class Interaction(SQLModel, table=True):
 class UserEmbedding(SQLModel, table=True):
     """
     User embeddings for collaborative filtering.
-    
+
     Design Rationale:
     - Separate table for ML features to keep user table clean
     - Version tracking for model updates and rollbacks
@@ -153,13 +153,15 @@ class UserEmbedding(SQLModel, table=True):
     - Indexing for efficient similarity search
     """
     __tablename__ = "user_embeddings"
+
+    model_config = {"protected_namespaces": ()}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(
         foreign_key="users.id",
         unique=True
     )
-    embedding_vector: List[float] = Field()
+    embedding_vector: Optional[List[float]] = Field(default=None, sa_column=Column(JSON))
     model_version: str = Field(
         max_length=50
     )
@@ -194,9 +196,7 @@ class UserFeatures(SQLModel, table=True):
     user_id: int = Field(
         foreign_key="users.id"
     )
-    feature_set: dict = Field(
-        
-    )
+    feature_set: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     computed_at: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime, server_default=func.now())
@@ -218,7 +218,7 @@ class UserFeatures(SQLModel, table=True):
 class MLModel(SQLModel, table=True):
     """
     ML model metadata and storage.
-    
+
     Design Rationale:
     - Model versioning for A/B testing and rollbacks
     - Metrics storage for model performance tracking
@@ -226,6 +226,8 @@ class MLModel(SQLModel, table=True):
     - Metadata for model lineage and reproducibility
     """
     __tablename__ = "ml_models"
+
+    model_config = {"protected_namespaces": ()}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     model_type: str = Field(
@@ -237,12 +239,8 @@ class MLModel(SQLModel, table=True):
     model_binary: bytes = Field(
         sa_column=Column(JSON, nullable=False)
     )  # Base64 encoded model
-    metrics: dict = Field(
-        default={}
-    )
-    hyperparameters: dict = Field(
-        default={}
-    )
+    metrics: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    hyperparameters: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime, server_default=func.now())

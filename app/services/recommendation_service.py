@@ -9,7 +9,7 @@ Design Rationale:
 - Supports A/B testing and experimentation
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import time

@@ -9,7 +9,7 @@ Design Rationale:
 - Clean module interface
 """
 
-from typing import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.base import SQLModelRepository
 from app.repositories.user_repository import UserRepository

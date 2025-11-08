@@ -20,7 +20,7 @@ from app.models.schemas import (
     ErrorResponse
 )
 from app.repositories.user_repository import UserRepository
-from app.core.dependencies import SessionDep, get_user_repository
+from app.core.dependencies import UserRepositoryDep
 from app.core.logging import get_logger
 from app.core.config import get_settings
 
@@ -37,7 +37,7 @@ router = APIRouter()
 )
 async def create_user(
     user_data: UserCreateRequest,
-    user_repository: UserRepository = Depends(get_user_repository)
+    user_repository: UserRepositoryDep
 ) -> UserResponse:
     """
     Create a new user.
@@ -78,7 +78,7 @@ async def create_user(
 )
 async def get_user(
     user_id: int,
-    user_repository: UserRepository = Depends(get_user_repository)
+    user_repository: UserRepositoryDep
 ) -> UserResponse:
     """
     Get user by ID.
@@ -122,7 +122,7 @@ async def get_user(
 async def update_user(
     user_id: int,
     user_data: UserUpdateRequest,
-    user_repository: UserRepository = Depends(get_user_repository)
+    user_repository: UserRepositoryDep
 ) -> UserResponse:
     """
     Update user.
@@ -180,7 +180,7 @@ async def update_user(
 )
 async def delete_user(
     user_id: int,
-    user_repository: UserRepository = Depends(get_user_repository)
+    user_repository: UserRepositoryDep
 ) -> None:
     """
     Delete user.
@@ -219,12 +219,12 @@ async def delete_user(
     description="Get a list of users with pagination"
 )
 async def list_users(
+    user_repository: UserRepositoryDep,
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
     location: Optional[str] = Query(None, description="Filter by location"),
     min_age: Optional[int] = Query(None, ge=18, description="Minimum age filter"),
-    max_age: Optional[int] = Query(None, le=120, description="Maximum age filter"),
-    user_repository: UserRepository = Depends(get_user_repository)
+    max_age: Optional[int] = Query(None, le=120, description="Maximum age filter")
 ) -> List[UserResponse]:
     """
     List users with optional filtering.
@@ -284,10 +284,10 @@ async def list_users(
     description="Get users who have been active recently"
 )
 async def search_active_users(
+    user_repository: UserRepositoryDep,
     days_since_active: int = Query(30, ge=1, le=365, description="Days since last activity"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
-    user_repository: UserRepository = Depends(get_user_repository)
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return")
 ) -> List[UserResponse]:
     """
     Search for active users.
@@ -327,9 +327,9 @@ async def search_active_users(
 )
 async def search_by_interest(
     interest: str,
+    user_repository: UserRepositoryDep,
     skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
-    user_repository: UserRepository = Depends(get_user_repository)
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return")
 ) -> List[UserResponse]:
     """
     Search users by interest.
