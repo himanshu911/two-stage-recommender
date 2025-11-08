@@ -50,16 +50,18 @@ The system follows a microservices-inspired architecture with clean separation o
 │ User Repository │ Interaction Repo│   Feature Repository        │
 │                 │                 │                             │
 ├─────────────────┼─────────────────┼─────────────────────────────┤
-│   PostgreSQL    │     Redis       │   Feature Store (PostgreSQL)│
-│   (Primary DB)  │    (Cache)      │                             │
+│   PostgreSQL    │  In-Memory Cache│   Feature Store (PostgreSQL)│
+│   (Primary DB)  │  (Redis ready)  │                             │
 └─────────────────┴─────────────────┴─────────────────────────────┘
 ```
+
+**Note**: Current implementation uses in-memory caching. Redis is available in docker-compose for production deployment.
 
 ## 🛠️ Technology Stack
 
 - **Web Framework**: FastAPI with async support
 - **Database**: PostgreSQL with SQLModel ORM
-- **Cache**: Redis for recommendation caching
+- **Cache**: In-memory caching (Redis available in docker-compose for production use)
 - **ML Framework**: Scikit-learn, PyTorch, FAISS
 - **Testing**: pytest with async support
 - **Deployment**: Docker with multi-stage builds
@@ -71,7 +73,7 @@ The system follows a microservices-inspired architecture with clean separation o
 
 - Python 3.11+
 - PostgreSQL 15+
-- Redis 7+
+- Redis 7+ (optional, included in docker-compose)
 - Docker (optional, for containerized deployment)
 
 ### Local Development Setup
@@ -96,17 +98,25 @@ The system follows a microservices-inspired architecture with clean separation o
 
 3. **Set up environment variables**
    ```bash
-   cp .env.example .env
-   # Edit .env with your database and Redis configuration
+   # Create .env file with your configuration
+   cat > .env << EOF
+   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/two-stage-recommender
+   REDIS_URL=redis://localhost:6379
+   ENVIRONMENT=development
+   DEBUG=True
+   LOG_LEVEL=INFO
+   EOF
    ```
 
 4. **Set up database**
    ```bash
    # Create database
    createdb two-stage-recommender
-   
-   # Run database migrations (if using Alembic)
-   alembic upgrade head
+
+   # (Optional) Add PostgreSQL extensions
+   psql two-stage-recommender < scripts/init-db.sql
+
+   # Tables will be created automatically on application startup via SQLModel
    ```
 
 5. **Run the application**
@@ -158,23 +168,33 @@ Once the application is running, access the interactive API documentation:
 - `GET /api/v1/users/{user_id}` - Get user by ID
 - `PUT /api/v1/users/{user_id}` - Update user
 - `DELETE /api/v1/users/{user_id}` - Delete user
-- `GET /api/v1/users/` - List users with filtering
+- `GET /api/v1/users/` - List users with filtering (location, age range, pagination)
+- `GET /api/v1/users/search/active` - Search for active users
+- `GET /api/v1/users/search/by-interest` - Search users by interest
 
 #### Interactions
-- `POST /api/v1/interactions/` - Create interaction (like/dislike/super_like)
-- `GET /api/v1/interactions/user/{user_id}` - Get user interactions
+- `POST /api/v1/interactions/` - Create interaction (like/dislike/super_like/block)
+- `GET /api/v1/interactions/user/{user_id}` - Get user interactions (with filtering)
 - `GET /api/v1/interactions/stats/{user_id}` - Get interaction statistics
+- `GET /api/v1/interactions/mutual/{user_id}/{target_user_id}` - Get mutual interactions
+- `GET /api/v1/interactions/recent/{user_id}` - Get recent interactions
+- `GET /api/v1/interactions/timeline/{user_id}` - Get interaction timeline
 
 #### Recommendations
-- `GET /api/v1/recommendations/users/{user_id}/recommendations` - Get recommendations
-- `GET /api/v1/recommendations/users/{user_id}/recommendations/explain` - Get with explanations
+- `GET /api/v1/recommendations/users/{user_id}/recommendations` - Get personalized recommendations
+- `GET /api/v1/recommendations/users/{user_id}/recommendations/explain` - Get recommendations with explanations
+- `GET /api/v1/recommendations/users/{user_id}/similar` - Find similar users
+- `POST /api/v1/recommendations/refresh` - Refresh recommendation cache
+- `GET /api/v1/recommendations/performance` - Get recommendation performance metrics
+- `GET /api/v1/recommendations/algorithm/versions` - Get available algorithm versions
 
 #### Health & Monitoring
 - `GET /api/v1/health/` - Comprehensive health check
-- `GET /api/v1/health/ready` - Readiness check
+- `GET /api/v1/health/ready` - Readiness check (for Kubernetes/load balancer)
 - `GET /api/v1/health/live` - Liveness check
 - `GET /api/v1/health/metrics` - Application metrics
 - `GET /api/v1/health/models` - ML model information
+- `GET /api/v1/health/dependencies` - Dependency status information
 
 ### Example Usage
 
@@ -243,9 +263,10 @@ tests/
 │   ├── test_user_api.py
 │   ├── test_recommendation_api.py
 │   └── ...
-├── e2e/           # End-to-end tests (full system)
 └── conftest.py    # Test configuration and fixtures
 ```
+
+**Note**: End-to-end tests are planned for future implementation.
 
 ## 🔧 Configuration
 
@@ -263,10 +284,11 @@ tests/
 
 ### Configuration Files
 
-- `.env` - Environment variables (create from `.env.example`)
-- `pytest.ini` - Test configuration
+- `.env` - Environment variables
+- `pytest.ini` - Test configuration with markers and coverage
 - `docker-compose.yml` - Docker services configuration
-- `pyproject.toml` - Python project configuration
+- `environment.yml` - Conda environment specification
+- `requirements.txt` - Python package dependencies
 
 ## 📈 Monitoring and Observability
 
@@ -315,10 +337,11 @@ Key metrics tracked:
    export LOG_LEVEL=WARNING
    ```
 
-2. **Database Migration**
+2. **Database Setup**
    ```bash
-   # Run migrations
-   alembic upgrade head
+   # Tables are created automatically via SQLModel on startup
+   # Optionally add PostgreSQL extensions:
+   psql $DATABASE_URL < scripts/init-db.sql
    ```
 
 3. **Start Application**
@@ -446,7 +469,7 @@ jobs:
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ## 🙏 Acknowledgments
 

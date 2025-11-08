@@ -165,10 +165,11 @@ async def get_recommendations(
   - Full-text search capabilities
   - Materialized views for performance
 
-- **Redis**: Caching layer for recommendations and features
-  - In-memory performance
+- **Redis**: Caching layer (available in docker-compose, integration planned)
+  - In-memory performance for low latency
   - TTL support for cache expiration
   - Pub/sub for real-time updates
+  - **Current Status**: Application uses in-memory Python dictionaries; Redis available but not yet integrated
 
 ### Machine Learning
 - **Scikit-learn**: ML algorithms and utilities
@@ -190,7 +191,9 @@ async def get_recommendations(
 - **Docker**: Containerization for deployment
 - **Docker Compose**: Local development environment
 - **SQLModel**: Type-safe ORM with Pydantic integration
-- **Alembic**: Database migration management
+  - Automatic table creation via `SQLModel.metadata.create_all()`
+  - Tables created on application startup (see `app/main.py`)
+- **Alembic**: Available for future database migration management (not currently implemented)
 
 ## Data Models
 
@@ -234,6 +237,21 @@ class UserFeatures(SQLModel, table=True):
     computed_at: datetime = Field(default_factory=datetime.utcnow)
     version: str = Field(sa_column=Column(String(50), nullable=False))
 ```
+
+### ML Model Storage
+```python
+class MLModel(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    model_type: str = Field(sa_column=Column(String(50), nullable=False))
+    version: str = Field(sa_column=Column(String(50), nullable=False))
+    model_binary: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
+    metrics: dict = Field(default={}, sa_column=Column(JSON))
+    hyperparameters: dict = Field(default={}, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    is_active: bool = Field(default=False, sa_column=Column(Boolean, nullable=False))
+```
+
+**Purpose**: Stores serialized ML models for versioning, A/B testing, and model persistence across service restarts. Used by RankingService to load and save trained models with their performance metrics and hyperparameters.
 
 ## Service Architecture
 
@@ -450,10 +468,11 @@ GET /api/v1/recommendations/users/123/recommendations?limit=20&min_age=25&max_ag
 ### Performance Optimization
 
 **Caching Strategy**:
-- Redis for recommendation caching (10-minute TTL)
-- Feature caching with 5-minute TTL
+- In-memory caching for recommendations (10-minute TTL) - currently implemented
+- Feature caching with 5-minute TTL - in-memory
+- Redis integration available via docker-compose (planned for production)
 - Database query result caching
-- CDN for static assets
+- CDN for static assets (planned)
 
 **Database Optimization**:
 - Connection pooling (10-20 connections)
