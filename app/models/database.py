@@ -9,7 +9,7 @@ Design patterns demonstrated:
 - Timestamp tracking for all entities
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, TYPE_CHECKING
 from enum import Enum
 
@@ -49,24 +49,27 @@ class User(SQLModel, table=True):
     
     # Timestamps for data lineage and debugging
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column=Column(DateTime, server_default=func.now())
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     )
-    updated_at: Optional[datetime] = Field(
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    )
+    last_active_at: Optional[datetime] = Field(
         default=None,
-        sa_column=Column(DateTime, onupdate=func.now())
+        sa_column=Column(DateTime(timezone=True))
     )
-    last_active_at: Optional[datetime] = Field(default=None)
     
     # Relationships
     interactions_made: List["Interaction"] = SQLRelationship(
         back_populates="user",
         sa_relationship_kwargs={
-            "primaryjoin": "User.id == Interaction.user_id",
+            "foreign_keys": "[Interaction.user_id]",
             "lazy": "selectin"  # Eager loading for better performance
         }
     )
-    
+
     interactions_received: List["Interaction"] = SQLRelationship(
         back_populates="target_user",
         sa_relationship_kwargs={
@@ -107,8 +110,8 @@ class Interaction(SQLModel, table=True):
     # Additional metadata for ML features
     context: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column=Column(DateTime, server_default=func.now(), index=True)
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), index=True, nullable=False)
     )
     
     # Relationships
@@ -161,13 +164,14 @@ class UserEmbedding(SQLModel, table=True):
         foreign_key="users.id",
         unique=True
     )
+    # TODO: Replace JSON embedding_vector with pgvector type (use pgvector extension for efficient similarity search)
     embedding_vector: Optional[List[float]] = Field(default=None, sa_column=Column(JSON))
     model_version: str = Field(
         max_length=50
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column=Column(DateTime, server_default=func.now())
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     )
     
     # Indexes for performance
@@ -198,8 +202,8 @@ class UserFeatures(SQLModel, table=True):
     )
     feature_set: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     computed_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column=Column(DateTime, server_default=func.now())
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     )
     version: str = Field(
         max_length=50
@@ -242,8 +246,8 @@ class MLModel(SQLModel, table=True):
     metrics: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     hyperparameters: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column=Column(DateTime, server_default=func.now())
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     )
     is_active: bool = Field(default=False)
     
