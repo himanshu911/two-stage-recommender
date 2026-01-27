@@ -80,13 +80,17 @@ class Settings(BaseSettings):
         
         return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
     
+    # Configuration for Pydantic (v1) Settings
+    # In Pydantic v2, this is done using model_config
+    #   from pydantic_settings import SettingsConfigDict
+    #   model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
     class Config:
+        # Load local dev defaults from .env (if present).
+        # Real environment variables still take precedence (production-friendly).
+        # class defaults are last
         env_file = ".env"
         case_sensitive = True
         extra = "ignore"
-        
-        # This allows environment variables to override file settings
-        # which is crucial for production deployments
         env_file_encoding = "utf-8"
 
 
@@ -99,6 +103,7 @@ def get_settings() -> Settings:
     - Using LRU cache to prevent repeated file I/O
     - Singleton pattern ensures consistent configuration across app
     - Cache makes configuration access effectively O(1)
+    - Note: singleton per process, N workers means N process and N settings instances
     """
     return Settings()
 

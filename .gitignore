@@ -55,6 +55,10 @@ conda-bld/
 .condarc
 .condaignore
 
+# AI/Tool directories
+.gemini/
+.claude/
+
 # Other
 *.bak
 *.swp

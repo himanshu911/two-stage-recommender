@@ -66,6 +66,8 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 async def create_tables() -> None:
     """Create all database tables."""
     async with engine.begin() as conn:
+        # run_sync bridges sync/async: metadata.create_all is sync, but we're in async context
+        # Without it, the sync call would block the event loop
         await conn.run_sync(SQLModel.metadata.create_all)
     logger.info("Database tables created")
 
@@ -73,6 +75,8 @@ async def create_tables() -> None:
 async def drop_tables() -> None:
     """Drop all database tables (for testing)."""
     async with engine.begin() as conn:
+        # run_sync bridges sync/async: metadata.drop_all is sync, but we're in async context
+        # Without it, the sync call would block the event loop
         await conn.run_sync(SQLModel.metadata.drop_all)
     logger.info("Database tables dropped")
     

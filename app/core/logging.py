@@ -44,6 +44,17 @@ def configure_logging() -> None:
         level=getattr(logging, settings.LOG_LEVEL.upper()),
     )
     
+    # TODO (logging): 
+    # Verify request-scoped context is actually included in output.
+    # We use structlog.contextvars.bind_contextvars(...) in LoggingContext, but the processor
+    # structlog.contextvars.merge_contextvars is not currently in the processors list.
+    # If request_id/user_id are missing from logs, add merge_contextvars early in both
+    # dev/prod processor chains and validate with a small test log inside LoggingContext.
+    # processors = [
+    # structlog.contextvars.merge_contextvars,
+    # TimeStamper(fmt="ISO"), 
+    # ....]
+
     # Configure structlog processors based on environment
     if settings.ENVIRONMENT == "development":
         # Human-readable format for development
