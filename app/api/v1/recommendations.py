@@ -126,7 +126,7 @@ async def get_recommendations_with_explanations(
         )
         
         return {
-            "recommendations": [rec.dict() for rec in recommendations],
+            "recommendations": [rec.model_dump() for rec in recommendations],
             "explanations": explanations,
             "total_count": len(recommendations)
         }

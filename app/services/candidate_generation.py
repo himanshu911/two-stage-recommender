@@ -379,7 +379,7 @@ class CandidateGenerationService:
                         source="content_based",
                         metadata={
                             "age_diff": abs(user_features.get("age", 0) - candidate.age),
-                            "common_interests": len(set(user_features.get("interests", [])) & set(candidate.interests))
+                            "common_interests": len(set(user_features.get("interests", [])) & set(candidate.interests or []))
                         }
                     ))
             
@@ -445,7 +445,7 @@ class CandidateGenerationService:
         
         # Interest similarity (Jaccard similarity)
         user_interests = set(user_features.get("interests", []))
-        candidate_interests = set(candidate.interests)
+        candidate_interests = set(candidate.interests or [])
         
         if user_interests or candidate_interests:
             intersection = len(user_interests & candidate_interests)

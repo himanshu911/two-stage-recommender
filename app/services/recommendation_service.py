@@ -269,7 +269,7 @@ class RecommendationService:
             
             # Common interests
             user_interests = set(user_features.get("interests", []))
-            candidate_interests = set(recommended_user.interests)
+            candidate_interests = set(recommended_user.interests or [])
             common_interests = user_interests & candidate_interests
             
             if common_interests:
@@ -360,8 +360,8 @@ class RecommendationService:
     def get_performance_metrics(self) -> Dict[str, Any]:
         """Get performance metrics for monitoring."""
         return {
-            "avg_generation_time_ms": sum(self._performance_metrics["generation_time"]) / len(self._performance_metrics["generation_time"]),
-            "avg_candidate_count": sum(self._performance_metrics["candidate_count"]) / len(self._performance_metrics["candidate_count"]),
+            "avg_generation_time_ms": sum(self._performance_metrics["generation_time"]) / max(len(self._performance_metrics["generation_time"]), 1),
+            "avg_candidate_count": sum(self._performance_metrics["candidate_count"]) / max(len(self._performance_metrics["candidate_count"]), 1),
             "cache_size": len(self._recommendation_cache),
             "model_version": self.ranking_service.model_version
         }

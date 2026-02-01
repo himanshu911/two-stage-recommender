@@ -301,8 +301,9 @@ class RankingService:
                 # Load model from binary data
                 model_binary = model_data.model_binary
                 
-                # In a real implementation, deserialize the model
-                # For now, we'll train a new model if needed
+                # Deserialize the model
+                self.model = pickle.loads(model_binary)
+                
                 logger.info("Model loaded from database", version=self.model_version)
             
             self.is_model_loaded = True

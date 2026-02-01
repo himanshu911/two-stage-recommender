@@ -15,7 +15,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, func
 from sqlalchemy.orm import selectinload
 
 from app.core.logging import get_logger
@@ -109,8 +109,9 @@ class SQLModelRepository(BaseRepository[T]):
             
             if load_relationships:
                 # Dynamically add selectinload for all relationships
-                for relationship in self.model_class.__sqlmodel_relationships__.values():
-                    query = query.options(selectinload(relationship.key))
+                relationships = getattr(self.model_class, "__sqlmodel_relationships__", {})
+                for relationship_name in relationships.keys():
+                    query = query.options(selectinload(getattr(self.model_class, relationship_name)))
             
             result = await self.session.execute(query)
             entity = result.scalar_one_or_none()
@@ -161,8 +162,9 @@ class SQLModelRepository(BaseRepository[T]):
             
             if load_relationships:
                 # Dynamically add selectinload for all relationships
-                for relationship in self.model_class.__sqlmodel_relationships__.values():
-                    query = query.options(selectinload(relationship.key))
+                relationships = getattr(self.model_class, "__sqlmodel_relationships__", {})
+                for relationship_name in relationships.keys():
+                    query = query.options(selectinload(getattr(self.model_class, relationship_name)))
             
             query = query.offset(skip).limit(limit)
             

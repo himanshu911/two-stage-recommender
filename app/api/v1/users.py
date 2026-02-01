@@ -53,17 +53,17 @@ async def create_user(
     """
     try:
         # Create user entity
-        user = User(**user_data.dict())
+        user = User(**user_data.model_dump())
         
         # Save to database
         created_user = await user_repository.create(user)
         
         logger.info("User created", user_id=created_user.id, name=created_user.name)
         
-        return UserResponse.from_orm(created_user)
+        return UserResponse.model_validate(created_user)
         
     except Exception as e:
-        logger.error("Error creating user", error=str(e), user_data=user_data.dict())
+        logger.error("Error creating user", error=str(e), user_data=user_data.model_dump())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create user"
@@ -101,7 +101,7 @@ async def get_user(
                 detail=f"User with ID {user_id} not found"
             )
         
-        return UserResponse.from_orm(user)
+        return UserResponse.model_validate(user)
         
     except HTTPException:
         raise
@@ -140,7 +140,7 @@ async def update_user(
     try:
         # Filter out None values for partial update
         update_data = {
-            key: value for key, value in user_data.dict(exclude_unset=True).items()
+            key: value for key, value in user_data.model_dump(exclude_unset=True).items()
             if value is not None
         }
         
@@ -160,7 +160,7 @@ async def update_user(
         
         logger.info("User updated", user_id=user_id, updated_fields=list(update_data.keys()))
         
-        return UserResponse.from_orm(updated_user)
+        return UserResponse.model_validate(updated_user)
         
     except HTTPException:
         raise
@@ -267,7 +267,7 @@ async def list_users(
         
         logger.debug("Users listed", count=len(users), skip=skip, limit=limit)
         
-        return [UserResponse.from_orm(user) for user in users]
+        return [UserResponse.model_validate(user) for user in users]
         
     except Exception as e:
         logger.error("Error listing users", error=str(e))
@@ -309,7 +309,7 @@ async def search_active_users(
             count=len(users)
         )
         
-        return [UserResponse.from_orm(user) for user in users]
+        return [UserResponse.model_validate(user) for user in users]
         
     except Exception as e:
         logger.error("Error searching active users", error=str(e))
@@ -347,7 +347,7 @@ async def search_by_interest(
         
         logger.debug("Users retrieved by interest", interest=interest, count=len(users))
         
-        return [UserResponse.from_orm(user) for user in users]
+        return [UserResponse.model_validate(user) for user in users]
         
     except Exception as e:
         logger.error("Error searching by interest", interest=interest, error=str(e))

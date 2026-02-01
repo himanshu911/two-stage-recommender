@@ -11,14 +11,13 @@ Design Rationale:
 
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timedelta
-import json
 from abc import ABC, abstractmethod
 
 import numpy as np
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, desc
 
-from app.models.database import User, Interaction, UserFeatures, UserEmbedding
+from app.models.database import User, Interaction, UserFeatures, UserEmbedding, InteractionType
 from app.repositories.user_repository import UserRepository
 from app.repositories.interaction_repository import InteractionRepository
 from app.core.logging import get_logger
@@ -65,7 +64,7 @@ class DemographicFeatureExtractor(FeatureExtractor):
             "gender": user.gender,
             "location": user.location,
             "account_age_days": (datetime.utcnow() - user.created_at).days,
-            "interests_count": len(user.interests)
+            "interests_count": len(user.interests or [])
         }
     
     def get_feature_schema(self) -> Dict[str, str]:

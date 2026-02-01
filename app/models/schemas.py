@@ -91,6 +91,7 @@ class UserResponse(BaseModel):
 
 class InteractionCreateRequest(BaseModel):
     """Request schema for creating an interaction."""
+    user_id: int = Field(..., description="ID of the user creating the interaction")
     target_user_id: int = Field(..., description="ID of the user being interacted with")
     interaction_type: InteractionType = Field(..., description="Type of interaction")
     context: Optional[Dict[str, Any]] = Field(
@@ -102,6 +103,12 @@ class InteractionCreateRequest(BaseModel):
     def validate_target_user_id(cls, v: int) -> int:
         if v <= 0:
             raise ValueError("target_user_id must be positive")
+        return v
+    
+    @validator('user_id')
+    def validate_user_id(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("user_id must be positive")
         return v
 
 
@@ -158,7 +165,7 @@ class ModelInfoResponse(BaseModel):
 class ErrorResponse(BaseModel):
     """Standard error response schema."""
     error: str = Field(..., description="Error message")
-    detail: Optional[str] = Field(None, description="Detailed error information")
+    detail: Optional[Any] = Field(None, description="Detailed error information")
     request_id: Optional[str] = Field(None, description="Request ID for debugging")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
     

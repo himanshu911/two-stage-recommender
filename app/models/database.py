@@ -10,10 +10,10 @@ Design patterns demonstrated:
 """
 
 from datetime import datetime, timezone
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List
 from enum import Enum
 
-from sqlalchemy import Column, Integer, String, DateTime, Float, JSON, Text, Index
+from sqlalchemy import Column, Integer, String, DateTime, Float, JSON, Text, Index, LargeBinary
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlmodel import Field, SQLModel, Relationship as SQLRelationship
@@ -241,8 +241,8 @@ class MLModel(SQLModel, table=True):
         max_length=50
     )
     model_binary: bytes = Field(
-        sa_column=Column(JSON, nullable=False)
-    )  # Base64 encoded model
+        sa_column=Column(LargeBinary, nullable=False)
+    )  # Pickled model binary
     metrics: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     hyperparameters: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(

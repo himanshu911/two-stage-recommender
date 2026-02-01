@@ -63,8 +63,16 @@ async def create_interaction(
     """
     try:
         # Validate that both users exist
-        user = await user_repository.get_by_id(interaction_data.target_user_id)
+        user = await user_repository.get_by_id(interaction_data.user_id)
+        target_user = await user_repository.get_by_id(interaction_data.target_user_id)
+        
         if not user:
+             raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID {interaction_data.user_id} not found"
+            )
+
+        if not target_user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Target user with ID {interaction_data.target_user_id} not found"
@@ -72,7 +80,7 @@ async def create_interaction(
         
         # Create interaction entity
         interaction = Interaction(
-            user_id=interaction_data.target_user_id,  # This should be the acting user
+            user_id=interaction_data.user_id,
             target_user_id=interaction_data.target_user_id,
             interaction_type=interaction_data.interaction_type,
             context=interaction_data.context or {}
@@ -82,12 +90,12 @@ async def create_interaction(
         created_interaction = await interaction_repository.create(interaction)
         
         # Update user's last active timestamp
-        await user_repository.update_last_active(interaction_data.target_user_id)
+        await user_repository.update_last_active(interaction_data.user_id)
         
         # Update ML features asynchronously (in production, use background tasks)
         try:
             await feature_service.compute_and_store_features(
-                interaction_data.target_user_id,
+                interaction_data.user_id,
                 version="v1"
             )
         except Exception as e:
@@ -100,7 +108,7 @@ async def create_interaction(
             interaction_type=created_interaction.interaction_type
         )
         
-        return InteractionResponse.from_orm(created_interaction)
+        return InteractionResponse.model_validate(created_interaction)
         
     except HTTPException:
         raise
@@ -166,7 +174,7 @@ async def get_user_interactions(
             count=len(interactions)
         )
         
-        return [InteractionResponse.from_orm(interaction) for interaction in interactions]
+        return [InteractionResponse.model_validate(interaction) for interaction in interactions]
         
     except HTTPException:
         raise
@@ -276,7 +284,7 @@ async def get_mutual_interactions(
             count=len(interactions)
         )
         
-        return [InteractionResponse.from_orm(interaction) for interaction in interactions]
+        return [InteractionResponse.model_validate(interaction) for interaction in interactions]
         
     except HTTPException:
         raise
@@ -339,7 +347,7 @@ async def get_recent_interactions(
             count=len(interactions)
         )
         
-        return [InteractionResponse.from_orm(interaction) for interaction in interactions]
+        return [InteractionResponse.model_validate(interaction) for interaction in interactions]
         
     except HTTPException:
         raise
