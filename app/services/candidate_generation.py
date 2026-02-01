@@ -18,7 +18,7 @@ import faiss
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
-from app.models.database import User, UserEmbedding, Interaction
+from app.models.database import User, UserEmbedding, Interaction, InteractionType
 from app.repositories.user_repository import UserRepository
 from app.repositories.interaction_repository import InteractionRepository
 from app.services.feature_service import FeatureService
@@ -492,7 +492,7 @@ class CandidateGenerationService:
             # Get interaction data
             query = (
                 select(Interaction.user_id, Interaction.target_user_id, Interaction.interaction_type)
-                .where(Interaction.interaction_type == "like")
+                .where(Interaction.interaction_type == InteractionType.LIKE)
             )
             
             result = await self.session.execute(query)
@@ -515,9 +515,9 @@ class CandidateGenerationService:
                 item_idx = item_to_idx[item_id]
                 
                 # Weight different interaction types
-                if interaction_type == "like":
+                if interaction_type == InteractionType.LIKE:
                     weight = 1.0
-                elif interaction_type == "super_like":
+                elif interaction_type == InteractionType.SUPER_LIKE:
                     weight = 2.0
                 else:
                     weight = 0.5

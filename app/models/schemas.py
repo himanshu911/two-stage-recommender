@@ -9,11 +9,11 @@ Design patterns demonstrated:
 - DTO pattern for data transformation
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from enum import Enum
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class InteractionType(str, Enum):
@@ -40,7 +40,8 @@ class UserCreateRequest(BaseModel):
     bio: Optional[str] = Field(None, max_length=1000, description="User's biography")
     interests: List[str] = Field(default=[], max_items=50, description="User's interests")
     
-    @validator('interests')
+    @field_validator('interests')
+    @classmethod
     def validate_interests(cls, v: List[str]) -> List[str]:
         """Validate that interests are unique and non-empty."""
         if not all(interest.strip() for interest in v):
@@ -56,7 +57,8 @@ class UserUpdateRequest(BaseModel):
     bio: Optional[str] = Field(None, max_length=1000)
     interests: Optional[List[str]] = Field(None, max_items=50)
     
-    @validator('interests')
+    @field_validator('interests')
+    @classmethod
     def validate_interests(cls, v: Optional[List[str]]) -> Optional[List[str]]:
         if v is not None:
             if not all(interest.strip() for interest in v):
@@ -80,11 +82,17 @@ class UserResponse(BaseModel):
     gender: str = Field(..., description="User's gender")
     location: str = Field(..., description="User's location")
     bio: Optional[str] = Field(None, description="User's biography")
-    interests: List[str] = Field(default=[], description="User's interests")
+    interests: List[str] = Field(default_factory=list, description="User's interests")
     created_at: datetime = Field(..., description="Account creation timestamp")
     last_active_at: Optional[datetime] = Field(None, description="Last activity timestamp")
     match_score: Optional[float] = Field(None, description="Recommendation score (0-1)")
-    
+
+    @field_validator('interests', mode='before')
+    @classmethod
+    def validate_interests_none(cls, v):
+        """Convert None to empty list for ORM compatibility (F7 fix)."""
+        return v if v is not None else []
+
     class Config:
         from_attributes = True  # Enable ORM mode for SQLModel compatibility
 
@@ -99,13 +107,15 @@ class InteractionCreateRequest(BaseModel):
         description="Additional context for the interaction"
     )
     
-    @validator('target_user_id')
+    @field_validator('target_user_id')
+    @classmethod
     def validate_target_user_id(cls, v: int) -> int:
         if v <= 0:
             raise ValueError("target_user_id must be positive")
         return v
-    
-    @validator('user_id')
+
+    @field_validator('user_id')
+    @classmethod
     def validate_user_id(cls, v: int) -> int:
         if v <= 0:
             raise ValueError("user_id must be positive")
@@ -167,5 +177,5 @@ class ErrorResponse(BaseModel):
     error: str = Field(..., description="Error message")
     detail: Optional[Any] = Field(None, description="Detailed error information")
     request_id: Optional[str] = Field(None, description="Request ID for debugging")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Error timestamp")
     

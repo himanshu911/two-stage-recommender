@@ -137,6 +137,8 @@ class Interaction(SQLModel, table=True):
         Index("idx_interaction_user_timestamp", "user_id", "timestamp"),
         Index("idx_interaction_target_user", "target_user_id"),
         Index("idx_interaction_type", "interaction_type"),
+        # Composite index for interaction count by type queries (F9 fix)
+        Index("idx_interaction_user_type", "user_id", "interaction_type"),
         # Ensure unique interactions to prevent duplicates
         Index("idx_unique_interaction", "user_id", "target_user_id", unique=True),
     )

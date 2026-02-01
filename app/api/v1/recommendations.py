@@ -17,8 +17,11 @@ from app.models.schemas import (
     RecommendationResponse,
     RecommendationRequest
 )
+from sqlalchemy import select
+
+from app.models.database import MLModel
 from app.services.recommendation_service import RecommendationService
-from app.core.dependencies import RecommendationServiceDep, FeatureServiceDep
+from app.core.dependencies import RecommendationServiceDep, FeatureServiceDep, SessionDep
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -237,13 +240,18 @@ async def get_performance_metrics(
     summary="Get available algorithm versions",
     description="List all available recommendation algorithm versions"
 )
-async def get_algorithm_versions() -> List[str]:
+async def get_algorithm_versions(session: SessionDep) -> List[str]:
     """
-    Get available algorithm versions.
-    
+    Get available algorithm versions from the database.
+
     Returns:
         List of available algorithm versions
     """
-    # In a real implementation, this would query the database
-    # For now, return hardcoded versions
-    return ["v1.0.0", "v1.1.0", "v2.0.0-beta"]
+    try:
+        query = select(MLModel.version).distinct()
+        result = await session.execute(query)
+        versions = [r[0] for r in result.all()]
+        return versions if versions else ["v1.0.0"]  # Fallback if no models in DB
+    except Exception as e:
+        logger.error("Error fetching algorithm versions", error=str(e))
+        return ["v1.0.0"]  # Fallback on error

@@ -11,7 +11,7 @@ This module demonstrates production patterns for configuration management:
 from functools import lru_cache
 from typing import Optional, List, Any
 
-from pydantic import validator, PostgresDsn
+from pydantic import model_validator, PostgresDsn
 from pydantic_settings import BaseSettings
 
 
@@ -62,28 +62,26 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     CORS_ORIGINS: List[str] = ["*"]
     
-    @validator("DATABASE_URL", pre=True)
-    def build_database_url(cls, v: Optional[str], values: dict) -> Any:
+    @model_validator(mode='before')
+    @classmethod
+    def build_database_url(cls, data: dict) -> dict:
         """
         Build database URL from components if not provided directly.
         This pattern allows both direct URL and component-based configuration.
         """
-        if isinstance(v, str):
-            return v
-        
-        # Fallback to building from components
-        user = values.get("POSTGRES_USER", "postgres")
-        password = values.get("POSTGRES_PASSWORD", "postgres")
-        host = values.get("POSTGRES_HOST", "localhost")
-        port = values.get("POSTGRES_PORT", 5432)
-        db = values.get("POSTGRES_DB", "two-stage-recommender")
-        
-        return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
+        if data.get("DATABASE_URL") is None:
+            # Fallback to building from components
+            user = data.get("POSTGRES_USER", "postgres")
+            password = data.get("POSTGRES_PASSWORD", "postgres")
+            host = data.get("POSTGRES_HOST", "localhost")
+            port = data.get("POSTGRES_PORT", 5432)
+            db = data.get("POSTGRES_DB", "two-stage-recommender")
+
+            data["DATABASE_URL"] = f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
+
+        return data
     
-    # Configuration for Pydantic (v1) Settings
-    # In Pydantic v2, this is done using model_config
-    #   from pydantic_settings import SettingsConfigDict
-    #   model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    # Configuration for Pydantic v2 Settings (using nested Config class for compatibility)
     class Config:
         # Load local dev defaults from .env (if present).
         # Real environment variables still take precedence (production-friendly).

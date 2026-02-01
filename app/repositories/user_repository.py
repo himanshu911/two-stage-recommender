@@ -10,7 +10,7 @@ Design Rationale:
 """
 
 from typing import List, Optional, Tuple, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, func, and_, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,17 +25,52 @@ logger = get_logger(__name__)
 class UserRepository(SQLModelRepository[User]):
     """
     Repository for User entity with domain-specific methods.
-    
+
     Design Rationale:
     - Extends base repository for standard CRUD operations
     - Adds user-specific query methods for common patterns
     - Implements efficient queries with proper indexing
     - Supports filtering and pagination for large datasets
     """
-    
+
     def __init__(self, session: AsyncSession):
         super().__init__(session, User)
-    
+
+    async def get_by_ids(self, ids: List[int]) -> List[User]:
+        """
+        Get users by list of IDs - efficient batch query.
+
+        Args:
+            ids: List of user IDs to fetch
+
+        Returns:
+            List of users matching the IDs
+        """
+        if not ids:
+            return []
+
+        try:
+            query = select(User).where(User.id.in_(ids))
+            result = await self.session.execute(query)
+            users = result.scalars().all()
+
+            logger.debug(
+                "Users retrieved by IDs",
+                requested_ids=len(ids),
+                found=len(users)
+            )
+
+            return list(users)
+
+        except Exception as e:
+            logger.error(
+                "Error retrieving users by IDs",
+                ids=ids,
+                error=str(e),
+                exc_info=True
+            )
+            raise
+
     async def get_by_location(
         self,
         location: str,
@@ -152,7 +187,7 @@ class UserRepository(SQLModelRepository[User]):
             List of active users
         """
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days_since_active)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_since_active)
             
             query = (
                 select(User)
@@ -344,7 +379,7 @@ class UserRepository(SQLModelRepository[User]):
             query = (
                 update(User)
                 .where(User.id == user_id)
-                .values(last_active_at=datetime.utcnow())
+                .values(last_active_at=datetime.now(timezone.utc))
             )
             
             result = await self.session.execute(query)

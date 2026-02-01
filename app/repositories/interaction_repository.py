@@ -10,7 +10,7 @@ Design Rationale:
 """
 
 from typing import List, Optional, Dict, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, func, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -225,7 +225,7 @@ class InteractionRepository(SQLModelRepository[Interaction]):
             List of recent interactions
         """
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
             
             query = (
                 select(Interaction)
@@ -279,7 +279,7 @@ class InteractionRepository(SQLModelRepository[Interaction]):
             List of tuples (date, interaction_type, count)
         """
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=lookback_days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=lookback_days)
             
             # This is a simplified version - in production you'd use date_trunc
             query = (

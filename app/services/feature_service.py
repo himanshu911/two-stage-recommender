@@ -10,7 +10,7 @@ Design Rationale:
 """
 
 from typing import Dict, Any, Optional, List, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -63,7 +63,7 @@ class DemographicFeatureExtractor(FeatureExtractor):
             "age": user.age,
             "gender": user.gender,
             "location": user.location,
-            "account_age_days": (datetime.utcnow() - user.created_at).days,
+            "account_age_days": (datetime.now(timezone.utc) - user.created_at).days,
             "interests_count": len(user.interests or [])
         }
     
@@ -115,7 +115,7 @@ class BehavioralFeatureExtractor(FeatureExtractor):
             return 0
         
         dates = set(interaction.timestamp.date() for interaction in interactions)
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         streak = 0
         
         for i in range(30):  # Max 30 days lookback
@@ -227,7 +227,7 @@ class FeatureService:
         # Check cache
         if use_cache and cache_key in self._feature_cache:
             features, timestamp = self._feature_cache[cache_key]
-            if datetime.utcnow() - timestamp < self._cache_ttl:
+            if datetime.now(timezone.utc) - timestamp < self._cache_ttl:
                 logger.debug("Features retrieved from cache", user_id=user_id)
                 return features
         
@@ -253,7 +253,7 @@ class FeatureService:
         
         # Cache features
         if use_cache:
-            self._feature_cache[cache_key] = (features, datetime.utcnow())
+            self._feature_cache[cache_key] = (features, datetime.now(timezone.utc))
         
         logger.debug("Features extracted", user_id=user_id, feature_count=len(features))
         return features
@@ -348,7 +348,7 @@ class FeatureService:
             Dictionary of features if found and not stale
         """
         try:
-            cutoff_time = datetime.utcnow() - timedelta(hours=max_age_hours)
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
             
             query = (
                 select(UserFeatures)
@@ -371,7 +371,7 @@ class FeatureService:
                     "Stored features retrieved",
                     user_id=user_id,
                     version=version,
-                    age_hours=(datetime.utcnow() - user_features.computed_at).total_seconds() / 3600
+                    age_hours=(datetime.now(timezone.utc) - user_features.computed_at).total_seconds() / 3600
                 )
                 return user_features.feature_set
             

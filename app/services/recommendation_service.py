@@ -11,7 +11,8 @@ Design Rationale:
 
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from collections import deque
 import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,11 +80,11 @@ class RecommendationService:
         self._recommendation_cache: Dict[str, Tuple[List[int], datetime]] = {}
         self._cache_ttl = timedelta(minutes=10)
         
-        # Performance tracking
-        self._performance_metrics: Dict[str, List[float]] = {
-            "generation_time": [],
-            "candidate_count": [],
-            "cache_hit_rate": []
+        # Performance tracking (deque auto-truncates to maxlen)
+        self._performance_metrics: Dict[str, deque] = {
+            "generation_time": deque(maxlen=100),
+            "candidate_count": deque(maxlen=100),
+            "cache_hit_rate": deque(maxlen=100)
         }
     
     async def get_recommendations(
@@ -108,14 +109,20 @@ class RecommendationService:
             RecommendationResponse with users and metadata
         """
         start_time = time.time()
-        
+
         try:
+            # Verify user exists (F4 fix)
+            requesting_user = await self.user_repository.get_by_id(user_id)
+            if not requesting_user:
+                logger.warning("User not found for recommendations", user_id=user_id)
+                return self._empty_response(user_id, start_time)
+
             # Check cache
             cache_key = f"recs:{user_id}:{limit}:{str(sorted(filters.items()) if filters else '')}"
-            
+
             if use_cache and cache_key in self._recommendation_cache:
                 cached_user_ids, timestamp = self._recommendation_cache[cache_key]
-                if datetime.utcnow() - timestamp < self._cache_ttl:
+                if datetime.now(timezone.utc) - timestamp < self._cache_ttl:
                     logger.debug("Recommendations retrieved from cache", user_id=user_id)
                     return await self._build_response_from_cache(
                         user_id, cached_user_ids, start_time
@@ -144,18 +151,10 @@ class RecommendationService:
                 logger.warning("No candidates ranked", user_id=user_id)
                 return self._empty_response(user_id, start_time)
             
-            # Step 3: Get user details
+            # Step 3: Get user details (F3 fix - use batch query instead of get_all + filter)
             recommended_user_ids = [rc.user_id for rc in ranked_candidates]
-            recommended_users = await self.user_repository.get_all(
-                limit=len(recommended_user_ids)
-            )
-            
-            # Filter to only recommended users
-            recommended_users = [
-                user for user in recommended_users
-                if user.id in recommended_user_ids
-            ]
-            
+            recommended_users = await self.user_repository.get_by_ids(recommended_user_ids)
+
             # Sort by ranking order
             user_map = {user.id: user for user in recommended_users}
             sorted_users = [user_map[user_id] for user_id in recommended_user_ids if user_id in user_map]
@@ -191,7 +190,7 @@ class RecommendationService:
             if use_cache:
                 self._recommendation_cache[cache_key] = (
                     recommended_user_ids,
-                    datetime.utcnow()
+                    datetime.now(timezone.utc)
                 )
             
             # Track performance
@@ -267,8 +266,9 @@ class RecommendationService:
             if user_features.get("location") == recommended_user.location:
                 explanation["reasons"].append("Same location")
             
-            # Common interests
-            user_interests = set(user_features.get("interests", []))
+            # Common interests (F1 fix - fetch from User model, not features)
+            requesting_user = await self.user_repository.get_by_id(user_id)
+            user_interests = set(requesting_user.interests or []) if requesting_user else set()
             candidate_interests = set(recommended_user.interests or [])
             common_interests = user_interests & candidate_interests
             
@@ -297,10 +297,9 @@ class RecommendationService:
     ) -> RecommendationResponse:
         """Build response from cached user IDs."""
         try:
-            # Get user details
-            users = await self.user_repository.get_all(limit=len(user_ids))
-            users = [user for user in users if user.id in user_ids]
-            
+            # Get user details (use batch query)
+            users = await self.user_repository.get_by_ids(user_ids)
+
             # Sort by cached order
             user_map = {user.id: user for user in users}
             sorted_users = [user_map[user_id] for user_id in user_ids if user_id in user_map]
@@ -349,13 +348,9 @@ class RecommendationService:
         generation_time_ms: float,
         cache_used: bool
     ) -> None:
-        """Track performance metrics."""
+        """Track performance metrics (deque auto-truncates to maxlen=100)."""
         self._performance_metrics["generation_time"].append(generation_time_ms)
         self._performance_metrics["candidate_count"].append(candidate_count)
-        
-        # Keep only recent metrics
-        for key in self._performance_metrics:
-            self._performance_metrics[key] = self._performance_metrics[key][-100:]
     
     def get_performance_metrics(self) -> Dict[str, Any]:
         """Get performance metrics for monitoring."""
@@ -368,7 +363,7 @@ class RecommendationService:
     
     async def refresh_cache(self) -> None:
         """Refresh recommendation cache by clearing old entries."""
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
         
         # Remove expired cache entries
         expired_keys = [

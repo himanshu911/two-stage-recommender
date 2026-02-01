@@ -10,7 +10,7 @@ Design Rationale:
 """
 
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status, Depends
 
 from app.models.schemas import HealthCheckResponse, ErrorResponse
@@ -45,7 +45,7 @@ async def health_check(
         HTTPException: If critical components are unhealthy
     """
     checks = {}
-    timestamp = datetime.utcnow()
+    timestamp = datetime.now(timezone.utc)
     
     try:
         # Database health check
@@ -121,7 +121,7 @@ async def readiness_check(session: SessionDep) -> Dict[str, str]:
     try:
         # Check database connectivity
         await session.execute(text("SELECT 1"))
-        return {"status": "ready", "timestamp": datetime.utcnow().isoformat()}
+        return {"status": "ready", "timestamp": datetime.now(timezone.utc).isoformat()}
         
     except Exception as e:
         logger.error("Readiness check failed", error=str(e))
@@ -144,7 +144,7 @@ async def liveness_check() -> Dict[str, str]:
     Returns:
         Liveness status
     """
-    return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "alive", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get(
@@ -164,10 +164,10 @@ async def get_metrics(
     """
     try:
         metrics = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "version": get_settings().APP_NAME,
             "environment": get_settings().ENVIRONMENT,
-            "uptime_seconds": (datetime.utcnow() - datetime(2024, 1, 1)).total_seconds(),
+            "uptime_seconds": (datetime.now(timezone.utc) - datetime(2024, 1, 1)).total_seconds(),
             "recommendation_metrics": recommendation_service.get_performance_metrics()
         }
         
@@ -203,12 +203,12 @@ async def get_model_info(
             "ranking_model": {
                 "version": get_settings().RANKING_MODEL_VERSION,
                 "status": "active",
-                "last_updated": datetime.utcnow().isoformat()
+                "last_updated": datetime.now(timezone.utc).isoformat()
             },
             "candidate_generation": {
                 "embedding_dimension": get_settings().EMBEDDING_DIMENSION,
                 "status": "active",
-                "last_trained": datetime.utcnow().isoformat()
+                "last_trained": datetime.now(timezone.utc).isoformat()
             }
         }
         

@@ -11,7 +11,7 @@ Design Rationale:
 
 from abc import ABC, abstractmethod
 from typing import TypeVar, Generic, Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
@@ -249,7 +249,7 @@ class SQLModelRepository(BaseRepository[T]):
             
             # Update timestamp if the model has updated_at field
             if hasattr(entity, 'updated_at'):
-                entity.updated_at = datetime.utcnow()
+                entity.updated_at = datetime.now(timezone.utc)
             
             await self.session.commit()
             await self.session.refresh(entity)
