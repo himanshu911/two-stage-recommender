@@ -19,21 +19,15 @@ from app.models.schemas import (
     InteractionResponse,
     ErrorResponse
 )
-from app.repositories.interaction_repository import InteractionRepository
-from app.repositories.user_repository import UserRepository
 from app.core.dependencies import (
-    get_user_repository,
-    get_interaction_repository,
-    get_feature_service,
     UserRepositoryDep,
     InteractionRepositoryDep,
     FeatureServiceDep
 )
 from app.core.logging import get_logger
-from app.services.feature_service import FeatureService
 
 logger = get_logger(__name__)
-router = APIRouter()
+router = APIRouter(tags=["Interactions"])
 
 
 @router.post(
@@ -62,6 +56,13 @@ async def create_interaction(
         HTTPException: If interaction creation fails
     """
     try:
+        # Prevent self-interaction
+        if interaction_data.user_id == interaction_data.target_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot create interaction with yourself"
+            )
+
         # Validate that both users exist
         user = await user_repository.get_by_id(interaction_data.user_id)
         target_user = await user_repository.get_by_id(interaction_data.target_user_id)
@@ -78,6 +79,14 @@ async def create_interaction(
                 detail=f"Target user with ID {interaction_data.target_user_id} not found"
             )
         
+        # TODO: Transaction atomicity issue - repository methods auto-commit individually.
+        # To fix properly:
+        # 1. Add SessionDep parameter to endpoint
+        # 2. Create non-committing repository methods
+        # 3. Move feature computation to background task queue (Celery/RQ)
+        # 4. Wrap all DB operations in explicit transaction with manual commit
+        # For now: Accept eventual consistency between interaction and last_active
+
         # Create interaction entity
         interaction = Interaction(
             user_id=interaction_data.user_id,
@@ -85,21 +94,23 @@ async def create_interaction(
             interaction_type=interaction_data.interaction_type,
             context=interaction_data.context or {}
         )
-        
-        # Save to database
+
+        # Save to database (commits immediately)
         created_interaction = await interaction_repository.create(interaction)
-        
-        # Update user's last active timestamp
+
+        # Update user's last active timestamp (commits immediately)
+        # NOTE: If this fails, interaction is already committed
         await user_repository.update_last_active(interaction_data.user_id)
-        
-        # Update ML features asynchronously (in production, use background tasks)
+
+        # TODO: Move to background task queue for true async processing
+        # Update ML features (failures are logged but don't block response)
         try:
             await feature_service.compute_and_store_features(
                 interaction_data.user_id,
                 version="v1"
             )
         except Exception as e:
-            logger.warning("Failed to update user features", error=str(e))
+            logger.warning("Failed to update user features - should retry via background job", error=str(e))
         
         logger.info(
             "Interaction created",
@@ -151,6 +162,14 @@ async def get_user_interactions(
         List of interaction responses
     """
     try:
+        # Validate date range
+        if start_date is not None and end_date is not None:
+            if start_date > end_date:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"start_date ({start_date}) cannot be after end_date ({end_date})"
+                )
+
         # Validate user exists
         user = await user_repository.get_by_id(user_id)
         if not user:
@@ -158,7 +177,7 @@ async def get_user_interactions(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"User with ID {user_id} not found"
             )
-        
+
         interactions = await interaction_repository.get_user_interactions(
             user_id=user_id,
             interaction_type=interaction_type,
@@ -211,6 +230,14 @@ async def get_interaction_stats(
         Dictionary of interaction counts by type
     """
     try:
+        # Validate date range
+        if start_date is not None and end_date is not None:
+            if start_date > end_date:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"start_date ({start_date}) cannot be after end_date ({end_date})"
+                )
+
         # Validate user exists
         user = await user_repository.get_by_id(user_id)
         if not user:
@@ -218,7 +245,7 @@ async def get_interaction_stats(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"User with ID {user_id} not found"
             )
-        
+
         stats = await interaction_repository.get_interaction_counts_by_type(
             user_id=user_id,
             start_date=start_date,

@@ -9,6 +9,7 @@ Design Rationale:
 - Model availability checking
 """
 
+import asyncio
 from typing import Dict, Any, List
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status, Depends
@@ -21,7 +22,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = get_logger(__name__)
-router = APIRouter()
+router = APIRouter(tags=["Health"])
+
+# Track application start time for accurate uptime calculation
+APP_START_TIME = datetime.now(timezone.utc)
 
 
 @router.get(
@@ -48,29 +52,41 @@ async def health_check(
     timestamp = datetime.now(timezone.utc)
     
     try:
-        # Database health check
+        # Database health check (with 5 second timeout)
         try:
-            await session.execute(text("SELECT 1"))
+            async with asyncio.timeout(5.0):
+                await session.execute(text("SELECT 1"))
             checks["database"] = "healthy"
+        except asyncio.TimeoutError:
+            checks["database"] = "unhealthy: timeout"
+            logger.error("Database health check timed out")
         except Exception as e:
             checks["database"] = f"unhealthy: {str(e)}"
             logger.error("Database health check failed", error=str(e))
-        
-        # Feature service health check
+
+        # Feature service health check (with 5 second timeout)
         try:
-            schema = feature_service.get_feature_schema()
-            if schema:
-                checks["feature_service"] = "healthy"
-            else:
-                checks["feature_service"] = "unhealthy: no feature schema"
+            async with asyncio.timeout(5.0):
+                schema = feature_service.get_feature_schema()
+                if schema:
+                    checks["feature_service"] = "healthy"
+                else:
+                    checks["feature_service"] = "unhealthy: no feature schema"
+        except asyncio.TimeoutError:
+            checks["feature_service"] = "unhealthy: timeout"
+            logger.error("Feature service health check timed out")
         except Exception as e:
             checks["feature_service"] = f"unhealthy: {str(e)}"
             logger.error("Feature service health check failed", error=str(e))
-        
-        # Recommendation service health check
+
+        # Recommendation service health check (with 5 second timeout)
         try:
-            metrics = recommendation_service.get_performance_metrics()
+            async with asyncio.timeout(5.0):
+                metrics = recommendation_service.get_performance_metrics()
             checks["recommendation_service"] = "healthy"
+        except asyncio.TimeoutError:
+            checks["recommendation_service"] = "unhealthy: timeout"
+            logger.error("Recommendation service health check timed out")
         except Exception as e:
             checks["recommendation_service"] = f"unhealthy: {str(e)}"
             logger.error("Recommendation service health check failed", error=str(e))
@@ -90,7 +106,7 @@ async def health_check(
         if overall_status == "unhealthy":
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=response
+                detail=response.model_dump()  # Convert Pydantic model to dict
             )
         
         return response
@@ -119,10 +135,17 @@ async def readiness_check(session: SessionDep) -> Dict[str, str]:
         Readiness status
     """
     try:
-        # Check database connectivity
-        await session.execute(text("SELECT 1"))
+        # Check database connectivity (with 5 second timeout)
+        async with asyncio.timeout(5.0):
+            await session.execute(text("SELECT 1"))
         return {"status": "ready", "timestamp": datetime.now(timezone.utc).isoformat()}
-        
+
+    except asyncio.TimeoutError:
+        logger.error("Readiness check timed out")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service not ready: timeout"
+        )
     except Exception as e:
         logger.error("Readiness check failed", error=str(e))
         raise HTTPException(
@@ -167,7 +190,7 @@ async def get_metrics(
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "version": get_settings().APP_NAME,
             "environment": get_settings().ENVIRONMENT,
-            "uptime_seconds": (datetime.now(timezone.utc) - datetime(2024, 1, 1)).total_seconds(),
+            "uptime_seconds": (datetime.now(timezone.utc) - APP_START_TIME).total_seconds(),
             "recommendation_metrics": recommendation_service.get_performance_metrics()
         }
         
@@ -197,21 +220,42 @@ async def get_model_info(
         Model information dictionary
     """
     try:
-        # In a real implementation, this would query the ML models table
-        # For now, return placeholder information
-        return {
-            "ranking_model": {
-                "version": get_settings().RANKING_MODEL_VERSION,
-                "status": "active",
-                "last_updated": datetime.now(timezone.utc).isoformat()
-            },
-            "candidate_generation": {
-                "embedding_dimension": get_settings().EMBEDDING_DIMENSION,
-                "status": "active",
-                "last_trained": datetime.now(timezone.utc).isoformat()
+        # Query actual ML models from database
+        from app.models.database import MLModel
+        from sqlalchemy import select
+
+        query = select(MLModel).order_by(MLModel.created_at.desc())
+        result = await session.execute(query)
+        models = result.scalars().all()
+
+        if not models:
+            # Return config-based defaults if no models in database
+            return {
+                "ranking_model": {
+                    "version": get_settings().RANKING_MODEL_VERSION,
+                    "status": "not_in_database",
+                    "source": "config"
+                },
+                "candidate_generation": {
+                    "embedding_dimension": get_settings().EMBEDDING_DIMENSION,
+                    "status": "not_in_database",
+                    "source": "config"
+                }
             }
-        }
-        
+
+        # Group models by type
+        models_by_type = {}
+        for model in models:
+            if model.model_type not in models_by_type:
+                models_by_type[model.model_type] = {
+                    "version": model.version,
+                    "is_active": model.is_active,
+                    "created_at": model.created_at.isoformat(),
+                    "metrics": model.metrics or {}
+                }
+
+        return models_by_type
+
     except Exception as e:
         logger.error("Error getting model info", error=str(e))
         raise HTTPException(
@@ -229,15 +273,31 @@ async def get_model_info(
 async def get_dependency_info() -> Dict[str, Any]:
     """
     Get dependency information.
-    
+
     Returns:
-        Dependency information dictionary
+        Dependency information dictionary (sanitized, no credentials)
     """
+    def sanitize_url(url: str) -> Dict[str, str]:
+        """Extract host/port from URL without credentials."""
+        from urllib.parse import urlparse
+        if not url:
+            return {"status": "not configured"}
+        try:
+            parsed = urlparse(url)
+            return {
+                "host": parsed.hostname or "unknown",
+                "port": parsed.port if parsed.port else "default",
+                "scheme": parsed.scheme,
+                "status": "configured"
+            }
+        except Exception:
+            return {"status": "invalid"}
+
     return {
-        "database_url": get_settings().DATABASE_URL,
-        "redis_url": get_settings().REDIS_URL,
+        "database": sanitize_url(get_settings().DATABASE_URL),
+        "redis": sanitize_url(get_settings().REDIS_URL),
+        "feature_store": sanitize_url(get_settings().FEATURE_STORE_URL),
         "model_storage_path": get_settings().MODEL_STORAGE_PATH,
-        "feature_store_url": get_settings().FEATURE_STORE_URL,
         "dependencies": {
             "fastapi": "0.104.1",
             "sqlalchemy": "2.0.23",

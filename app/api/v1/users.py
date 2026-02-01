@@ -25,7 +25,7 @@ from app.core.logging import get_logger
 from app.core.config import get_settings
 
 logger = get_logger(__name__)
-router = APIRouter()
+router = APIRouter(tags=["Users"])
 
 
 @router.post(
@@ -213,71 +213,6 @@ async def delete_user(
 
 
 @router.get(
-    "/",
-    response_model=List[UserResponse],
-    summary="List users",
-    description="Get a list of users with pagination"
-)
-async def list_users(
-    user_repository: UserRepositoryDep,
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
-    location: Optional[str] = Query(None, description="Filter by location"),
-    min_age: Optional[int] = Query(None, ge=18, description="Minimum age filter"),
-    max_age: Optional[int] = Query(None, le=120, description="Maximum age filter")
-) -> List[UserResponse]:
-    """
-    List users with optional filtering.
-    
-    Args:
-        skip: Number of records to skip
-        limit: Maximum number of records to return
-        location: Optional location filter
-        min_age: Optional minimum age filter
-        max_age: Optional maximum age filter
-        
-    Returns:
-        List of user responses
-    """
-    try:
-        # Build filters
-        filters = {}
-        if location:
-            filters["location"] = location
-        if min_age is not None:
-            filters["min_age"] = min_age
-        if max_age is not None:
-            filters["max_age"] = max_age
-        
-        # Apply filters if provided, otherwise use basic pagination
-        if filters:
-            if location:
-                users = await user_repository.get_by_location(location, skip, limit)
-            elif min_age is not None or max_age is not None:
-                users = await user_repository.get_by_age_range(
-                    min_age or 18,
-                    max_age or 120,
-                    skip,
-                    limit
-                )
-            else:
-                users = await user_repository.get_all(skip, limit)
-        else:
-            users = await user_repository.get_all(skip, limit)
-        
-        logger.debug("Users listed", count=len(users), skip=skip, limit=limit)
-        
-        return [UserResponse.model_validate(user) for user in users]
-        
-    except Exception as e:
-        logger.error("Error listing users", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list users"
-        )
-
-
-@router.get(
     "/search/active",
     response_model=List[UserResponse],
     summary="Search active users",
@@ -355,4 +290,76 @@ async def search_by_interest(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to search users by interest"
         )
-    
+
+
+@router.get(
+    "/",
+    response_model=List[UserResponse],
+    summary="List users",
+    description="Get a list of users with pagination"
+)
+async def list_users(
+    user_repository: UserRepositoryDep,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
+    location: Optional[str] = Query(None, description="Filter by location"),
+    min_age: Optional[int] = Query(None, ge=18, description="Minimum age filter"),
+    max_age: Optional[int] = Query(None, le=120, description="Maximum age filter")
+) -> List[UserResponse]:
+    """
+    List users with optional filtering.
+
+    Args:
+        skip: Number of records to skip
+        limit: Maximum number of records to return
+        location: Optional location filter
+        min_age: Optional minimum age filter
+        max_age: Optional maximum age filter
+
+    Returns:
+        List of user responses
+    """
+    try:
+        # Validate age range
+        if min_age is not None and max_age is not None:
+            if min_age > max_age:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"min_age ({min_age}) cannot be greater than max_age ({max_age})"
+                )
+
+        # Build filters
+        filters = {}
+        if location:
+            filters["location"] = location
+        if min_age is not None:
+            filters["min_age"] = min_age
+        if max_age is not None:
+            filters["max_age"] = max_age
+
+        # Apply filters if provided, otherwise use basic pagination
+        if filters:
+            if location:
+                users = await user_repository.get_by_location(location, skip, limit)
+            elif min_age is not None or max_age is not None:
+                users = await user_repository.get_by_age_range(
+                    min_age or 18,
+                    max_age or 120,
+                    skip,
+                    limit
+                )
+            else:
+                users = await user_repository.get_all(skip, limit)
+        else:
+            users = await user_repository.get_all(skip, limit)
+
+        logger.debug("Users listed", count=len(users), skip=skip, limit=limit)
+
+        return [UserResponse.model_validate(user) for user in users]
+
+    except Exception as e:
+        logger.error("Error listing users", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list users"
+        )

@@ -25,7 +25,7 @@ from app.core.dependencies import RecommendationServiceDep, FeatureServiceDep, S
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter()
+router = APIRouter(tags=["Recommendations"])
 
 
 @router.get(
@@ -37,6 +37,7 @@ router = APIRouter()
 async def get_recommendations(
     user_id: int,
     recommendation_service: RecommendationServiceDep,
+    session: SessionDep,
     limit: int = Query(20, ge=1, le=100, description="Number of recommendations"),
     exclude_seen: bool = Query(True, description="Exclude users already seen"),
     min_age: Optional[int] = Query(None, ge=18, description="Minimum age filter"),
@@ -63,6 +64,21 @@ async def get_recommendations(
         HTTPException: If recommendations cannot be generated
     """
     try:
+        # Validate algorithm version if specified
+        if algorithm_version:
+            # Get available versions
+            query = select(MLModel.version).distinct()
+            result = await session.execute(query)
+            available_versions = [r[0] for r in result.all()]
+            if not available_versions:
+                available_versions = ["v1.0.0"]
+
+            if algorithm_version not in available_versions:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Invalid algorithm version '{algorithm_version}'. Available versions: {', '.join(available_versions)}"
+                )
+
         # Build filters
         filters = {}
         if min_age is not None:
@@ -71,7 +87,7 @@ async def get_recommendations(
             filters["max_age"] = max_age
         if location:
             filters["location"] = location
-        
+
         # Update algorithm version if specified
         if algorithm_version:
             await recommendation_service.update_algorithm_version(algorithm_version)
@@ -167,18 +183,13 @@ async def find_similar_users(
     Returns:
         List of similar users
     """
-    try:
-        # This would typically use the collaborative filtering model
-        # For now, return empty list as placeholder
-        logger.warning("Similar users endpoint not fully implemented", user_id=user_id)
-        return []
-        
-    except Exception as e:
-        logger.error("Error finding similar users", user_id=user_id, error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to find similar users"
-        )
+    # This endpoint is not yet implemented
+    # Will use collaborative filtering model when ready
+    logger.info("Similar users endpoint called but not implemented", user_id=user_id)
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Similar users feature is not yet implemented"
+    )
 
 
 @router.post(
@@ -251,7 +262,21 @@ async def get_algorithm_versions(session: SessionDep) -> List[str]:
         query = select(MLModel.version).distinct()
         result = await session.execute(query)
         versions = [r[0] for r in result.all()]
-        return versions if versions else ["v1.0.0"]  # Fallback if no models in DB
+
+        if not versions:
+            # Return 404 if no models in database
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No algorithm versions found in database"
+            )
+
+        return versions
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Error fetching algorithm versions", error=str(e))
-        return ["v1.0.0"]  # Fallback on error
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch algorithm versions"
+        )
