@@ -440,7 +440,7 @@ Content-Type: application/json
 
 **Solution: Database-Backed Model Registry**
 
-From `app/models/database.py:119-142`:
+From `app.models.sql_models.py:119-142`:
 ```python
 class MLModel(SQLModel, table=True):
     __tablename__ = "ml_models"

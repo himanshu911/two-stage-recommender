@@ -18,7 +18,7 @@ import faiss
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
-from app.models.database import User, UserEmbedding, Interaction, InteractionType
+from app.models.sql_models import User, UserEmbedding, Interaction, InteractionType
 from app.repositories.user_repository import UserRepository
 from app.repositories.interaction_repository import InteractionRepository
 from app.services.feature_service import FeatureService

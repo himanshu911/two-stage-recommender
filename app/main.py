@@ -20,7 +20,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
-from app.core.database import create_tables
+from app.core.db import create_tables
 from app.api.v1 import api_router
 from app.models.schemas import ErrorResponse
 

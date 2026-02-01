@@ -14,7 +14,7 @@ from unittest.mock import Mock, AsyncMock, patch
 import pytest
 from datetime import datetime, timedelta
 
-from app.models.database import User
+from app.models.sql_models import User
 from app.repositories.user_repository import UserRepository
 from app.core.logging import get_logger
 

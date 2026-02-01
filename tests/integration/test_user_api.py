@@ -13,8 +13,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import User
-from app.core.database import SQLModel
+from app.models.sql_models import User
+from app.core.db import SQLModel
 from app.models.schemas import UserCreateRequest, UserUpdateRequest
 
 

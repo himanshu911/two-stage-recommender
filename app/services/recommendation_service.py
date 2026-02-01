@@ -17,7 +17,7 @@ import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import User
+from app.models.sql_models import User
 from app.models.schemas import UserResponse, RecommendationResponse
 from app.services.candidate_generation import CandidateGenerationService, Candidate
 from app.services.ranking_service import RankingService, RankedCandidate

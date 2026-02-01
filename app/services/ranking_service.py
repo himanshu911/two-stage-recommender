@@ -19,7 +19,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import User, MLModel
+from app.models.sql_models import User, MLModel
 from app.services.feature_service import FeatureService
 from app.repositories.user_repository import UserRepository
 from app.core.logging import get_logger

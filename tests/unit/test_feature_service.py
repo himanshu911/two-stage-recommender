@@ -20,7 +20,7 @@ from app.services.feature_service import (
     BehavioralFeatureExtractor,
     CollaborativeFeatureExtractor
 )
-from app.models.database import User, Interaction
+from app.models.sql_models import User, Interaction
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)

@@ -19,8 +19,8 @@ from httpx import AsyncClient
 
 from app.main import app
 from app.core.config import get_settings
-from app.core.database import SQLModel
-from app.models.database import User, Interaction, UserEmbedding, UserFeatures
+from app.core.db import SQLModel
+from app.models.sql_models import User, Interaction, UserEmbedding, UserFeatures
 
 # Test database URL
 TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/two-stage-recommender_test"

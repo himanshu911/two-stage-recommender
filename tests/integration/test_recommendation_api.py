@@ -13,8 +13,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import User, Interaction
-from app.core.database import SQLModel
+from app.models.sql_models import User, Interaction
+from app.core.db import SQLModel
 
 
 class TestRecommendationAPI:

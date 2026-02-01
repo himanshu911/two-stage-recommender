@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.base import SQLModelRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.interaction_repository import InteractionRepository
-from app.models.database import User, Interaction, UserEmbedding, UserFeatures, MLModel
+from app.models.sql_models import User, Interaction, UserEmbedding, UserFeatures, MLModel
 
 
 __all__ = [

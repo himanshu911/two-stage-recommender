@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, func, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import Interaction, InteractionType, User
+from app.models.sql_models import Interaction, InteractionType, User
 from app.repositories.base import SQLModelRepository
 from app.core.logging import get_logger
 

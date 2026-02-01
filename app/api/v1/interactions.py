@@ -13,7 +13,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 
-from app.models.database import Interaction, InteractionType
+from app.models.sql_models import Interaction, InteractionType
 from app.models.schemas import (
     InteractionResponse,
     ErrorResponse,

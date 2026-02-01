@@ -968,7 +968,7 @@ cached = await self._cache.get(cache_key)
 ### Connection Pooling Configuration
 
 ```python
-# app/core/database.py
+# app.core.db.py
 engine = create_async_engine(
     str(settings.DATABASE_URL),
     pool_size=10,                       # Base connections

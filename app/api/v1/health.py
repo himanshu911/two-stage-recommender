@@ -221,7 +221,7 @@ async def get_model_info(
     """
     try:
         # Query actual ML models from database
-        from app.models.database import MLModel
+        from app.models.sql_models import MLModel
         from sqlalchemy import select
 
         query = select(MLModel).order_by(MLModel.created_at.desc())

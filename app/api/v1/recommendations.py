@@ -22,7 +22,7 @@ from app.models.schemas import (
 )
 from sqlalchemy import select
 
-from app.models.database import MLModel
+from app.models.sql_models import MLModel
 from app.services.recommendation_service import RecommendationService
 from app.core.dependencies import RecommendationServiceDep, FeatureServiceDep, SessionDep
 from app.core.logging import get_logger

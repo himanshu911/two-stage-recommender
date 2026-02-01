@@ -12,7 +12,7 @@ Design Rationale:
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 
-from app.models.database import User
+from app.models.sql_models import User
 from app.models.schemas import (
     UserCreateRequest,
     UserUpdateRequest,
