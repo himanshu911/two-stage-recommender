@@ -227,29 +227,12 @@ class InteractionRepository(SQLModelRepository[Interaction]):
         try:
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
             
-            query = (
-                select(Interaction)
-                .where(
-                    and_(
-                        Interaction.user_id == user_id,
-                        Interaction.timestamp >= cutoff_date
-                    )
-                )
-                .order_by(desc(Interaction.timestamp))
-                .limit(limit)
-            )
-            
-            result = await self.session.execute(query)
-            interactions = result.scalars().all()
-            
-            logger.debug(
-                "Recent interactions retrieved",
+            # Reuse get_user_interactions logic
+            return await self.get_user_interactions(
                 user_id=user_id,
-                days=days,
-                count=len(interactions)
+                start_date=cutoff_date,
+                limit=limit
             )
-            
-            return list(interactions)
             
         except Exception as e:
             logger.error(

@@ -178,4 +178,38 @@ class ErrorResponse(BaseModel):
     detail: Optional[Any] = Field(None, description="Detailed error information")
     request_id: Optional[str] = Field(None, description="Request ID for debugging")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Error timestamp")
+
+
+class TimelineEntry(BaseModel):
+    """Entry in an interaction timeline."""
+    date: str = Field(..., description="Date of the interval (ISO format)")
+    interaction_type: InteractionType = Field(..., description="Type of interaction")
+    count: int = Field(..., description="Count of interactions in this interval")
+
+
+class ExplanationEntry(BaseModel):
+    """Explanation for a single recommendation."""
+    user_id: int = Field(..., description="ID of the recommended user")
+    score: float = Field(..., description="Recommendation score")
+    reason: List[str] = Field(..., description="List of reasons for the recommendation")
+    contributing_features: Dict[str, float] = Field(..., description="Features contributing to the score")
+
+
+class ExplanationResponse(BaseModel):
+    """Response schema for recommendations with explanations."""
+    recommendations: List[UserResponse] = Field(..., description="List of recommended users")
+    explanations: Dict[int, ExplanationEntry] = Field(..., description="Map of user ID to explanation")
+    total_count: int = Field(..., description="Total number of recommendations")
+
+
+class PerformanceMetrics(BaseModel):
+    """Performance metrics for the system."""
+    latency_p50: float = Field(..., description="50th percentile latency in ms")
+    latency_p95: float = Field(..., description="95th percentile latency in ms")
+    latency_p99: float = Field(..., description="99th percentile latency in ms")
+    throughput_rps: float = Field(..., description="Requests per second")
+    cache_hit_rate: float = Field(..., description="Cache hit rate (0-1)")
+    error_rate: float = Field(..., description="Error rate (0-1)")
+    model_loading_time_ms: float = Field(..., description="Model loading time in ms")
+    active_models: Dict[str, str] = Field(..., description="Map of model types to active versions")
     

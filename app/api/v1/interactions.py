@@ -15,14 +15,15 @@ from fastapi import APIRouter, HTTPException, status, Depends, Query
 
 from app.models.database import Interaction, InteractionType
 from app.models.schemas import (
-    InteractionCreateRequest,
     InteractionResponse,
-    ErrorResponse
+    ErrorResponse,
+    TimelineEntry
 )
 from app.core.dependencies import (
     UserRepositoryDep,
     InteractionRepositoryDep,
-    FeatureServiceDep
+    FeatureServiceDep,
+    SessionDep
 )
 from app.core.logging import get_logger
 
@@ -41,7 +42,8 @@ async def create_interaction(
     interaction_data: InteractionCreateRequest,
     user_repository: UserRepositoryDep,
     interaction_repository: InteractionRepositoryDep,
-    feature_service: FeatureServiceDep
+    feature_service: FeatureServiceDep,
+    session: SessionDep
 ) -> InteractionResponse:
     """
     Create a new interaction.
@@ -79,14 +81,6 @@ async def create_interaction(
                 detail=f"Target user with ID {interaction_data.target_user_id} not found"
             )
         
-        # TODO: Transaction atomicity issue - repository methods auto-commit individually.
-        # To fix properly:
-        # 1. Add SessionDep parameter to endpoint
-        # 2. Create non-committing repository methods
-        # 3. Move feature computation to background task queue (Celery/RQ)
-        # 4. Wrap all DB operations in explicit transaction with manual commit
-        # For now: Accept eventual consistency between interaction and last_active
-
         # Create interaction entity
         interaction = Interaction(
             user_id=interaction_data.user_id,
@@ -95,22 +89,31 @@ async def create_interaction(
             context=interaction_data.context or {}
         )
 
-        # Save to database (commits immediately)
-        created_interaction = await interaction_repository.create(interaction)
+        # Save to database (no commit yet)
+        created_interaction = await interaction_repository.create(interaction, commit=False)
 
-        # Update user's last active timestamp (commits immediately)
-        # NOTE: If this fails, interaction is already committed
-        await user_repository.update_last_active(interaction_data.user_id)
+        # Update user's last active timestamp (no commit yet)
+        await user_repository.update_last_active(interaction_data.user_id, commit=False)
 
-        # TODO: Move to background task queue for true async processing
-        # Update ML features (failures are logged but don't block response)
+        # Update ML features (compute first, if it fails we haven't committed DB yet)
+        # Note: In a real prod environment, this should be a background task. 
+        # But if we want strong consistency for the "feature update" part, we do it here.
+        # However, the requirement was to fix the DB atomicity.
         try:
             await feature_service.compute_and_store_features(
                 interaction_data.user_id,
                 version="v1"
             )
         except Exception as e:
-            logger.warning("Failed to update user features - should retry via background job", error=str(e))
+            # If features fail, we log but still might want to proceed with the interaction
+            # OR we might want to rollback everything. 
+            # Given the audit report said: "If step 2 or 3 fails, the interaction exists but user state is inconsistent."
+            # We will choose to proceed (log warning) but ensure DB consistency is at least atomic.
+             logger.warning("Failed to update user features", error=str(e))
+        
+        # Commit the transaction for both DB operations
+        await session.commit()
+        await session.refresh(created_interaction)
         
         logger.info(
             "Interaction created",
@@ -124,6 +127,7 @@ async def create_interaction(
     except HTTPException:
         raise
     except Exception as e:
+        await session.rollback()
         logger.error("Error creating interaction", error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -392,7 +396,7 @@ async def get_recent_interactions(
 
 @router.get(
     "/timeline/{user_id}",
-    response_model=List[Dict[str, Any]],
+    response_model=List[TimelineEntry],
     summary="Get interaction timeline",
     description="Get interaction counts over time"
 )
@@ -402,7 +406,7 @@ async def get_interaction_timeline(
     user_repository: UserRepositoryDep,
     interval_days: int = Query(7, ge=1, le=30, description="Days per interval"),
     lookback_days: int = Query(30, ge=1, le=365, description="Total days to look back")
-) -> List[Dict[str, Any]]:
+) -> List[TimelineEntry]:
     """
     Get interaction timeline for a user.
     
@@ -429,14 +433,14 @@ async def get_interaction_timeline(
             lookback_days=lookback_days
         )
         
-        # Convert to list of dictionaries for JSON serialization
+        # Convert to list of TimelineEntry
         timeline_data = []
         for date, interaction_type, count in timeline:
-            timeline_data.append({
-                "date": date.isoformat(),
-                "interaction_type": interaction_type,
-                "count": count
-            })
+            timeline_data.append(TimelineEntry(
+                date=date.isoformat(),
+                interaction_type=interaction_type,
+                count=count
+            ))
         
         logger.debug(
             "Interaction timeline retrieved",

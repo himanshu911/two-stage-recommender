@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import get_settings
@@ -185,6 +186,28 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
     # Always set request ID header
+    if request_id:
+        response.headers["X-Request-ID"] = request_id
+
+    return response
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_exception_handler(request: Request, exc: IntegrityError):
+    """Handle database integrity errors (e.g., unique constraints)."""
+    request_id = getattr(request.state, "request_id", None)
+
+    logger.warning("Integrity error", path=request.url.path, error=str(exc), request_id=request_id)
+
+    response = JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=ErrorResponse(
+            error="Conflict",
+            detail="Database constraint violation",
+            request_id=request_id
+        ).model_dump(mode='json')
+    )
+
     if request_id:
         response.headers["X-Request-ID"] = request_id
 

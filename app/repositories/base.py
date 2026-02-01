@@ -62,17 +62,17 @@ class BaseRepository(Generic[T], ABC):
         pass
     
     @abstractmethod
-    async def create(self, entity: T) -> T:
+    async def create(self, entity: T, commit: bool = True) -> T:
         """Create a new entity."""
         pass
     
     @abstractmethod
-    async def update(self, id: int, entity_data: Dict[str, Any]) -> Optional[T]:
+    async def update(self, id: int, entity_data: Dict[str, Any], commit: bool = True) -> Optional[T]:
         """Update an existing entity."""
         pass
     
     @abstractmethod
-    async def delete(self, id: int) -> bool:
+    async def delete(self, id: int, commit: bool = True) -> bool:
         """Delete an entity."""
         pass
     
@@ -192,20 +192,25 @@ class SQLModelRepository(BaseRepository[T]):
             )
             raise
     
-    async def create(self, entity: T) -> T:
+    async def create(self, entity: T, commit: bool = True) -> T:
         """
         Create a new entity.
         
         Args:
             entity: Entity instance to create
+            commit: Whether to commit the transaction immediately
             
         Returns:
             Created entity with generated ID
         """
         try:
             self.session.add(entity)
-            await self.session.commit()
-            await self.session.refresh(entity)
+            if commit:
+                await self.session.commit()
+                await self.session.refresh(entity)
+            else:
+                await self.session.flush()
+                await self.session.refresh(entity)
             
             self.logger.info(
                 "Entity created",
@@ -225,13 +230,14 @@ class SQLModelRepository(BaseRepository[T]):
             )
             raise
     
-    async def update(self, id: int, entity_data: Dict[str, Any]) -> Optional[T]:
+    async def update(self, id: int, entity_data: Dict[str, Any], commit: bool = True) -> Optional[T]:
         """
         Update an existing entity.
         
         Args:
             id: Primary key of entity to update
             entity_data: Dictionary of fields to update
+            commit: Whether to commit the transaction immediately
             
         Returns:
             Updated entity or None if not found
@@ -251,8 +257,12 @@ class SQLModelRepository(BaseRepository[T]):
             if hasattr(entity, 'updated_at'):
                 entity.updated_at = datetime.now(timezone.utc)
             
-            await self.session.commit()
-            await self.session.refresh(entity)
+            if commit:
+                await self.session.commit()
+                await self.session.refresh(entity)
+            else:
+                await self.session.flush()
+                await self.session.refresh(entity)
             
             self.logger.info(
                 "Entity updated",
@@ -274,12 +284,13 @@ class SQLModelRepository(BaseRepository[T]):
             )
             raise
     
-    async def delete(self, id: int) -> bool:
+    async def delete(self, id: int, commit: bool = True) -> bool:
         """
         Delete an entity.
         
         Args:
             id: Primary key of entity to delete
+            commit: Whether to commit the transaction immediately
             
         Returns:
             True if entity was deleted, False if not found
@@ -287,7 +298,10 @@ class SQLModelRepository(BaseRepository[T]):
         try:
             query = delete(self.model_class).where(self.model_class.id == id)
             result = await self.session.execute(query)
-            await self.session.commit()
+            if commit:
+                await self.session.commit()
+            else:
+                await self.session.flush()
             
             deleted = result.rowcount > 0
             

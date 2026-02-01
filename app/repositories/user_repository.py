@@ -365,12 +365,13 @@ class UserRepository(SQLModelRepository[User]):
             )
             raise
     
-    async def update_last_active(self, user_id: int) -> bool:
+    async def update_last_active(self, user_id: int, commit: bool = True) -> bool:
         """
         Update user's last active timestamp.
         
         Args:
             user_id: ID of the user
+            commit: Whether to commit the transaction immediately
             
         Returns:
             True if update was successful
@@ -383,7 +384,10 @@ class UserRepository(SQLModelRepository[User]):
             )
             
             result = await self.session.execute(query)
-            await self.session.commit()
+            if commit:
+                await self.session.commit()
+            else:
+                await self.session.flush()
             
             updated = result.rowcount > 0
             

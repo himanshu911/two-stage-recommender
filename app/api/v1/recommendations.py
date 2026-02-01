@@ -15,7 +15,10 @@ from fastapi import APIRouter, HTTPException, status, Depends, Query
 from app.models.schemas import (
     UserResponse,
     RecommendationResponse,
-    RecommendationRequest
+    RecommendationRequest,
+    ExplanationResponse,
+    PerformanceMetrics,
+    ExplanationEntry
 )
 from sqlalchemy import select
 
@@ -119,7 +122,7 @@ async def get_recommendations(
 
 @router.get(
     "/users/{user_id}/recommendations/explain",
-    response_model=Dict[str, Any],
+    response_model=ExplanationResponse,
     summary="Get recommendations with explanations",
     description="Get recommendations with detailed explanations for each recommendation"
 )
@@ -127,7 +130,7 @@ async def get_recommendations_with_explanations(
     user_id: int,
     recommendation_service: RecommendationServiceDep,
     limit: int = Query(20, ge=1, le=100, description="Number of recommendations")
-) -> Dict[str, Any]:
+) -> ExplanationResponse:
     """
     Get recommendations with explanations.
     
@@ -144,11 +147,22 @@ async def get_recommendations_with_explanations(
             limit=limit
         )
         
-        return {
-            "recommendations": [rec.model_dump() for rec in recommendations],
-            "explanations": explanations,
-            "total_count": len(recommendations)
-        }
+        # Transform explanations to match ExplanationEntry schema if needed
+        # Assuming explanations is a dict of user_id -> explanation details
+        typed_explanations = {}
+        for uid, expl in explanations.items():
+            typed_explanations[uid] = ExplanationEntry(
+                user_id=int(uid) if isinstance(uid, str) else uid,
+                score=expl.get("score", 0.0),
+                reason=expl.get("reason", []) if isinstance(expl.get("reason"), list) else [str(expl.get("reason"))],
+                contributing_features=expl.get("contributing_features", {})
+            )
+
+        return ExplanationResponse(
+            recommendations=recommendations,
+            explanations=typed_explanations,
+            total_count=len(recommendations)
+        )
         
     except Exception as e:
         logger.error(
@@ -221,13 +235,13 @@ async def refresh_recommendations(
 
 @router.get(
     "/performance",
-    response_model=Dict[str, Any],
+    response_model=PerformanceMetrics,
     summary="Get recommendation performance metrics",
     description="Get performance metrics for the recommendation system"
 )
 async def get_performance_metrics(
     recommendation_service: RecommendationServiceDep
-) -> Dict[str, Any]:
+) -> PerformanceMetrics:
     """
     Get recommendation performance metrics.
     
@@ -235,7 +249,8 @@ async def get_performance_metrics(
         Performance metrics dictionary
     """
     try:
-        return recommendation_service.get_performance_metrics()
+        metrics = recommendation_service.get_performance_metrics()
+        return PerformanceMetrics(**metrics)
         
     except Exception as e:
         logger.error("Error getting performance metrics", error=str(e))
